@@ -1,10 +1,11 @@
 import { Elysia } from "elysia";
 import { apiRoutes } from "./routes";
 import { checkDbConnection, db } from "./common/config/database/database.config";
-import { appLogger } from "./common/config/logging/logging.config";
-import { logMiddleware } from "./common/middlewares/logging.middleware";
 import { errorMiddleware } from "./common/middlewares/error.middleware";
 import swagger from "@elysiajs/swagger";
+import { appLogger } from "./common/config/logging/logging.config";
+import { logMiddleware } from "./common/middlewares/logging.middleware";
+import { jwtPlugin } from "./common/config/auth/jwt.config";
 
 const app = new Elysia()
     .use(swagger({
@@ -14,16 +15,26 @@ const app = new Elysia()
                 title: 'Backend API Barang Documentation',
                 version: '1.0.0',
                 description: 'Dokumentasi lengkap untuk manajemen data barang'
+            },
+            components: {
+                securitySchemes: {
+                    BearerAuth: {
+                        type: 'http',
+                        scheme: 'bearer',
+                        bearerFormat: 'JWT'
+                    }
+                }
             }
-        }
+        },
     }))
+    .use(jwtPlugin)
     .use(logMiddleware)
     .use(errorMiddleware)
     .use(apiRoutes)
 
 const shutdown = async () => {
     appLogger.info(`APPLICATION: Graceful shutdown START`)
-    
+
     await app.stop()
     appLogger.info(`APPLICATION: Request handler stoped`)
 
