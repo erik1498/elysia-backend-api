@@ -1,6 +1,6 @@
 import Elysia from "elysia"
 import { appLogger } from "../config/logging/logging.config"
-import { RequestMeta } from "../types/context"
+import { RequestMeta } from "../interface/context"
 
 export const logMiddleware = (app: Elysia) => app
     .decorate("appLogger", appLogger)

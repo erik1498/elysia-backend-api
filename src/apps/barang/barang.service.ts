@@ -1,5 +1,5 @@
 import { BadRequestError, NotFoundError } from "../../common/errors/app.error";
-import { RequestMeta } from "../../common/types/context";
+import { RequestMeta } from "../../common/interface/context";
 import { barangRepository } from "./barang.repository";
 
 export const barangService = {
@@ -9,7 +9,7 @@ export const barangService = {
         return data
     },
     getBarangByUuidService: async (uuid: string, meta: RequestMeta) => {
-        meta.log.info(uuid, "SERVICE: barangService.getBarangByUuidService called")
+        meta.log.info({ uuid }, "SERVICE: barangService.getBarangByUuidService called")
         const data = await barangRepository.getBarangByUuidRepository(uuid)
 
         if (!data) {
@@ -23,7 +23,7 @@ export const barangService = {
         const uuid = crypto.randomUUID()
         data.uuid = uuid
 
-        const created = await barangRepository.createBarangRepository(data)
+        const created = await barangRepository.createBarangRepository(data, meta)
 
         if (!created || created[0].affectedRows == 0) {
             throw new BadRequestError
@@ -33,7 +33,7 @@ export const barangService = {
     },
     updateBarangService: async (uuid: string, data: any, meta: RequestMeta) => {
         meta.log.info({ uuid, data }, "SERVICE: barangService.updateBarangService called")
-        const updated = await barangRepository.updateBarangRepository(uuid, data)
+        const updated = await barangRepository.updateBarangRepository(uuid, data, meta)
 
         if (!updated || updated[0].affectedRows == 0) {
             throw new NotFoundError
@@ -43,7 +43,7 @@ export const barangService = {
     },
     deleteBarangService: async (uuid: string, meta: RequestMeta) => {
         meta.log.info({ uuid }, "SERVICE: barangService.deleteBarangService called")
-        const deleted = await barangRepository.deleteBarangRepository(uuid)
+        const deleted = await barangRepository.deleteBarangRepository(uuid, meta)
 
         if (!deleted || deleted[0].affectedRows == 0) {
             throw new NotFoundError
