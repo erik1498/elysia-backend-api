@@ -1,3 +1,4 @@
+import { cache } from "../../../common/config/storage/redis.config"
 import { AppUtil } from "../../../common/utils/app.util"
 import { ApiResponseUtil } from "../../../common/utils/response.util"
 import { userService } from "./user.service"
@@ -53,11 +54,15 @@ export const userHandler = {
             data
         })
     },
-    logoutHandler: async ({ cookie: { refreshToken }, set, meta }: any) => {
+    logoutHandler: async ({ cookie: { refreshToken }, request: { headers }, set, meta }: any) => {
         meta.log.info("HANDLER: userHandler.logoutHandler hit")
         await userService.logoutService(meta)
 
         await refreshToken.remove()
+
+        const token = headers.get("authorization").slice(7)
+
+        await cache.set(`bl:${token}`, 'true', 'EX', 900)
 
         set.status = 204
     }

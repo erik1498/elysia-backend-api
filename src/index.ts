@@ -6,6 +6,7 @@ import swagger from "@elysiajs/swagger";
 import { appLogger } from "./common/config/logging/logging.config";
 import { logMiddleware } from "./common/middlewares/logging.middleware";
 import { jwtPlugin } from "./common/config/auth/jwt.config";
+import { cache, checkRedisConnection } from "./common/config/storage/redis.config";
 
 const app = new Elysia()
     .use(swagger({
@@ -41,11 +42,16 @@ const shutdown = async () => {
     await db.$client.end();
     appLogger.info(`DATABASE: End connection`)
 
+    cache.close();
+    appLogger.info(`REDIS: End connection`)
+
     process.exit(0);
 };
 
 const startServer = async () => {
     await checkDbConnection();
+
+    await checkRedisConnection();
 
     app
         .listen(Number(Bun.env.PORT), (server) => {
