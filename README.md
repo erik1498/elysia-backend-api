@@ -52,14 +52,6 @@ Mengeksekusi file SQL yang ada di folder /drizzle ke database fisik.
 bun db:migrate
 ```
 
-### Langkah C: Database GUI (Studio)
-
-Melihat dan memanipulasi data secara visual melalui antarmuka web.
-
-```bash
-bun db:studio
-```
-
 🚀 3. Menjalankan Aplikasi
 --------------------------
 
