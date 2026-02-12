@@ -1,11 +1,21 @@
 import { Elysia } from "elysia";
 import { AppError } from "../errors/app.error";
 import { ApiResponseUtil } from "../utils/response.util";
+import { AppUtil } from "../utils/app.util";
 
 export const errorMiddleware = (app: Elysia) =>
     app
-        .onError(({ error, set, code }: any) => {
+        .onError(({ error, set, code, meta }: any) => {
 
+            if (code !== "VALIDATION") {
+                meta.log.error({
+                    code,
+                    message: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error && AppUtil.checkProductionType() ? undefined : error.stack,
+                    path: `HTTP ${meta.logMethod} ${meta.logPath}`
+                }, "GLOBAL_ERROR_HANDLER");
+            }
+        
             if (error instanceof AppError) {
                 set.status = error.statusCode;
                 return ApiResponseUtil.error({

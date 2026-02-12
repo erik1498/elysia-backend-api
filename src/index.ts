@@ -1,11 +1,13 @@
 import { Elysia } from "elysia";
 import { apiRoutes } from "./routes";
 import { checkDbConnection, db } from "./common/config/database/database.config";
+import { appLogger } from "./common/config/logging/logging.config";
+import { logMiddleware } from "./common/middlewares/logging.middleware";
 import { errorMiddleware } from "./common/middlewares/error.middleware";
 import swagger from "@elysiajs/swagger";
 
 const app = new Elysia()
-    .use(swagger({ 
+    .use(swagger({
         path: '/docs',
         documentation: {
             info: {
@@ -15,17 +17,18 @@ const app = new Elysia()
             }
         }
     }))
+    .use(logMiddleware)
     .use(errorMiddleware)
     .use(apiRoutes)
 
 const shutdown = async () => {
-    console.log(`APPLICATION: Graceful shutdown START`)
+    appLogger.info(`APPLICATION: Graceful shutdown START`)
     
     await app.stop()
-    console.log(`APPLICATION: Request handler stoped`)
+    appLogger.info(`APPLICATION: Request handler stoped`)
 
     await db.$client.end();
-    console.log(`DATABASE: End connection`)
+    appLogger.info(`DATABASE: End connection`)
 
     process.exit(0);
 };
@@ -35,7 +38,7 @@ const startServer = async () => {
 
     app
         .listen(Number(Bun.env.PORT), (server) => {
-            console.log(`APPLICATION: Running on http://${server?.hostname}:${server?.port}`)
+            appLogger.info(`APPLICATION: Running on http://${server?.hostname}:${server?.port}`)
         });
 }
 
