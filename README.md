@@ -59,7 +59,7 @@ bun db:migrate
 Setelah tabel terbuat, Anda perlu memasukkan data master (Admin & Role). Anda bisa melakukannya melalui **Drizzle Studio** (Visual) atau SQL Client:
 
 ```sql
--- 1. Tambah User Admin (Password: admin123)  
+-- 1. Tambah User Admin (Password: admin)  
 INSERT INTO user_tab (uuid, nama, username, password) VALUES  ('5f522ed1-8a70-4c10-8ce4-b89c47b0a240', 'ADMINISTRATOR', 'admin', '$2b$10$Zi/A.A4IfmBVpoLSG0ORx.jFgofn4dXfUWyAY88aGAFsMVe77VYYO');  
 
 -- 2. Tambah Master Roles  
