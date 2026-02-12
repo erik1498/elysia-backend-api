@@ -7,6 +7,7 @@ import { appLogger } from "./common/config/logging/logging.config";
 import { logMiddleware } from "./common/middlewares/logging.middleware";
 import { jwtPlugin } from "./common/config/auth/jwt.config";
 import { cache, checkRedisConnection } from "./common/config/storage/redis.config";
+import { rateLimiter } from "./common/middlewares/rate-limit.middleware";
 
 const app = new Elysia()
     .use(swagger({
@@ -28,6 +29,7 @@ const app = new Elysia()
             }
         },
     }))
+    .use(rateLimiter("app", 80, 60))
     .use(jwtPlugin)
     .use(logMiddleware)
     .use(errorMiddleware)

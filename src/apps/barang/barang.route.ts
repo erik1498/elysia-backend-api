@@ -3,12 +3,14 @@ import { BaseResponseSchema } from "../../common/schemas/response.schema";
 import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
 import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
+import { rateLimiter } from "../../common/middlewares/rate-limit.middleware";
 
 export const barangRoute = (app: Elysia) => {
     return app
         .group("/barang", (group) =>
             group
                 .use(jwtMiddleware)
+                .use(rateLimiter("barang", 60, 60))
                 .get("/", barangHandler.getAllBarangHandler, {
                     detail: {
                         tags: ["Barang"],

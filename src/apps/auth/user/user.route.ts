@@ -3,6 +3,7 @@ import { BaseResponseSchema } from "../../../common/schemas/response.schema";
 import { UserInfoResponseSchema, UserLoginBodySchema, UserLoginResponseSchema, UserRegisterBodySchema } from "./user.schema";
 import { jwtMiddleware } from "../../../common/middlewares/jwt.middleware";
 import { userHandler } from "./user.handler";
+import { rateLimiter } from "../../../common/middlewares/rate-limit.middleware";
 
 export const userRoute = (app: Elysia) => {
     return app
@@ -10,6 +11,7 @@ export const userRoute = (app: Elysia) => {
             group
                 .group("", noAuthGroup =>
                     noAuthGroup
+                        .use(rateLimiter("/auth", 3, 900))
                         .post("/login", userHandler.loginHandler, {
                             body: UserLoginBodySchema,
                             detail: {
