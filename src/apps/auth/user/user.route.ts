@@ -1,0 +1,63 @@
+import Elysia, { t } from "elysia";
+import { BaseResponseSchema } from "../../../common/schemas/response.schema";
+import { UserInfoResponseSchema, UserLoginBodySchema, UserLoginResponseSchema, UserRegisterBodySchema } from "./user.schema";
+import { jwtMiddleware } from "../../../common/middlewares/jwt.middleware";
+import { userHandler } from "./user.handler";
+
+export const userRoute = (app: Elysia) => {
+    return app
+        .group("/user", group =>
+            group
+                .group("", noAuthGroup =>
+                    noAuthGroup
+                        .post("/login", userHandler.loginHandler, {
+                            body: UserLoginBodySchema,
+                            detail: {
+                                tags: ["User"],
+                                summary: "User Login"
+                            },
+                            response: {
+                                200: BaseResponseSchema(UserLoginResponseSchema)
+                            }
+                        })
+                        .get("/refresh", userHandler.refreshUserHandler, {
+                            detail: {
+                                tags: ["User"],
+                                summary: "User Refresh"
+                            },
+                            response: {
+                                200: BaseResponseSchema(UserLoginResponseSchema)
+                            }
+                        })
+                )
+                .group("", group => 
+                    group
+                        .use(jwtMiddleware)
+                        .post("/register", userHandler.registerHandler, {
+                            body: UserRegisterBodySchema,
+                            detail: {
+                                tags: ["User"],
+                                summary: "User Register"
+                            },
+                            response: {
+                                201: BaseResponseSchema(t.Any())
+                            }
+                        })
+                        .get("/user_info", userHandler.getUserInfoHandler, {
+                            detail: {
+                                tags: ["User"],
+                                summary: "User Information"
+                            },
+                            response: {
+                                200: BaseResponseSchema(UserInfoResponseSchema)
+                            }
+                        })
+                        .delete("/logout", userHandler.logoutHandler, {
+                            detail: {
+                                tags: ["User"],
+                                summary: "User Logout"
+                            }
+                        })
+                )
+        )
+}

@@ -1,12 +1,14 @@
 import { BaseResponseSchema } from "../../common/schemas/response.schema";
 import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
+import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
 import { BarangBodySchema, BarangResponseSchema } from "./barang.schema";
 
 export const barangRoute = (app: Elysia) => {
     return app
         .group("/barang", (group) =>
             group
+                .use(jwtMiddleware)
                 .get("/", barangHandler.getAllBarangHandler, {
                     detail: {
                         tags: ["Barang"],
