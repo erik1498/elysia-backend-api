@@ -16,3 +16,10 @@ export const BarangBodySchema = t.Object({
         examples: ["Barang Detail"]
     })
 })
+
+export const BarangResponseSchema = t.Object({
+    uuid: t.String({ format: 'uuid' }),
+    nama: t.String(),
+    harga: t.Numeric(),
+    detail: t.String(),
+});
