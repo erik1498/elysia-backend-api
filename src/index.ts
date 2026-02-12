@@ -2,8 +2,19 @@ import { Elysia } from "elysia";
 import { apiRoutes } from "./routes";
 import { checkDbConnection, db } from "./common/config/database/database.config";
 import { errorMiddleware } from "./common/middlewares/error.middleware";
+import swagger from "@elysiajs/swagger";
 
 const app = new Elysia()
+    .use(swagger({ 
+        path: '/docs',
+        documentation: {
+            info: {
+                title: 'Backend API Barang Documentation',
+                version: '1.0.0',
+                description: 'Dokumentasi lengkap untuk manajemen data barang'
+            }
+        }
+    }))
     .use(errorMiddleware)
     .use(apiRoutes)
 
