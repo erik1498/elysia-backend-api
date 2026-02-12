@@ -1,8 +1,10 @@
 import Elysia from "elysia";
 import { TooManyRequestError } from "../errors/app.error";
+import { cache } from "../config/storage/redis.config";
 
 export const rateLimiter = (groupName: string, limit: number, duration: number) => (app: Elysia) =>
     app
+        .decorate("cache", cache)
         .onBeforeHandle(async ({ request, set, cache, meta }: any) => {
             const id = meta.userUuid || request.headers.get('x-forwarded-for') || 'anonymous';
 
