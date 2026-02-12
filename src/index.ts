@@ -1,8 +1,10 @@
 import { Elysia } from "elysia";
 import { apiRoutes } from "./routes";
 import { checkDbConnection, db } from "./common/config/database/database.config";
+import { errorMiddleware } from "./common/middlewares/error.middleware";
 
 const app = new Elysia()
+    .use(errorMiddleware)
     .use(apiRoutes)
 
 const shutdown = async () => {
