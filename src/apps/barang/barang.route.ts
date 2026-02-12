@@ -1,8 +1,8 @@
+import { BarangBodySchema, BarangResponseSchema } from "./barang.schema";
 import { BaseResponseSchema } from "../../common/schemas/response.schema";
 import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
 import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
-import { BarangBodySchema, BarangResponseSchema } from "./barang.schema";
 
 export const barangRoute = (app: Elysia) => {
     return app
@@ -31,6 +31,7 @@ export const barangRoute = (app: Elysia) => {
                     }
                 })
                 .post("/", barangHandler.createBarangHandler, {
+                    roles: ["super_admin"],
                     body: BarangBodySchema,
                     detail: {
                         tags: ["Barang"],
@@ -41,6 +42,7 @@ export const barangRoute = (app: Elysia) => {
                     }
                 })
                 .put("/:uuid", barangHandler.updateBarangHandler, {
+                    roles: ["super_admin"],
                     params: t.Object({
                         uuid: t.String({ format: 'uuid' })
                     }),
@@ -54,6 +56,7 @@ export const barangRoute = (app: Elysia) => {
                     }
                 })
                 .delete("/:uuid", barangHandler.deleteBarangHandler, {
+                    roles: ["super_admin"],
                     params: t.Object({
                         uuid: t.String({ format: 'uuid' })
                     }),
