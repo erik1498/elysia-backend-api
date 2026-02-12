@@ -1,9 +1,21 @@
 import Elysia from "elysia";
-import { UnauthorizedError } from "../errors/app.error";
+import { ForbiddenError, UnauthorizedError } from "../errors/app.error";
 import { cache } from "../config/storage/redis.config";
 
 export const jwtMiddleware = (app: Elysia) =>
     app
+        .macro("roles", (authorizedRoles: string[]) => {
+            return {
+                beforeHandle: ({ meta }: any) => {
+                    const hasAccess = meta.userRoles.some((role: string) =>
+                        authorizedRoles.includes(role)
+                    )
+                    if (!hasAccess) {
+                        throw new ForbiddenError
+                    }
+                }
+            }
+        })
         .derive(async ({ accessTokenConfig, request, meta }: any) => {
             const auth = request.headers.get("authorization")
 

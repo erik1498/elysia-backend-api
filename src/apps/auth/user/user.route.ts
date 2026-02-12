@@ -34,6 +34,7 @@ export const userRoute = (app: Elysia) => {
                     group
                         .use(jwtMiddleware)
                         .post("/register", userHandler.registerHandler, {
+                            roles: ["super_admin"],
                             body: UserRegisterBodySchema,
                             detail: {
                                 tags: ["User"],
