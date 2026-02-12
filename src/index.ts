@@ -8,8 +8,11 @@ import { logMiddleware } from "./common/middlewares/logging.middleware";
 import { jwtPlugin } from "./common/config/auth/jwt.config";
 import { cache, checkRedisConnection } from "./common/config/storage/redis.config";
 import { rateLimiter } from "./common/middlewares/rate-limit.middleware";
+import { elysiaSecuritySetting, securityPlugin } from "./common/security/app.security";
 
-const app = new Elysia()
+const app = new 
+    Elysia(elysiaSecuritySetting)
+    .use(securityPlugin)
     .use(swagger({
         path: '/docs',
         documentation: {
