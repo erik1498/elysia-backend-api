@@ -5,23 +5,31 @@ import { sanitizerMiddleware } from "../middlewares/sanitizer.middleware";
 
 export const securityPlugin = (app: Elysia) =>
     app
+        .all("*", ({ set }) => {
+            set.status = 404;
+            return {
+                success: false,
+                code: "NOT_FOUND",
+                message: `Not Found`
+            };
+        })
         .use(cors({
             origin: Bun.env.CORS_ORIGIN,
             methods: ['GET', 'POST', 'PUT', 'DELETE'],
             allowedHeaders: ['Content-Type', 'Authorization'],
             credentials: true,
         }))
-        // .use(helmet({
-        //     contentSecurityPolicy: {
-        //         directives: {
-        //             defaultSrc: ["'self'"],
-        //             scriptSrc: ["'self'", "'unsafe-inline'"],
-        //             objectSrc: ["'none'"],
-        //             upgradeInsecureRequests: [],
-        //         },
-        //     },
-        //     hidePoweredBy: true,
-        // }))
+        .use(helmet({
+            contentSecurityPolicy: {
+                directives: {
+                    defaultSrc: ["'self'"],
+                    scriptSrc: ["'self'", "'unsafe-inline'"],
+                    objectSrc: ["'none'"],
+                    upgradeInsecureRequests: [],
+                },
+            },
+            hidePoweredBy: true,
+        }))
         .use(sanitizerMiddleware)
 
 export const elysiaSecuritySetting = {
