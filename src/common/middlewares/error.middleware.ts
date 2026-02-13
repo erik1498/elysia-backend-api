@@ -20,7 +20,8 @@ export const errorMiddleware = (app: Elysia) =>
                 set.status = error.statusCode;
                 return ApiResponseUtil.error({
                     message: error.message,
-                    code: error.code
+                    code: error.code,
+                    details: error.details
                 })
             }
 
@@ -35,7 +36,7 @@ export const errorMiddleware = (app: Elysia) =>
 
                     return {
                         field: cleanField || 'root',
-                        message: err.message
+                        message: err.schema.error || err.message
                     };
                 });
 
