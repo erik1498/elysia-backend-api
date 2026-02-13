@@ -2,9 +2,10 @@ import { ApiResponseUtil } from "../../common/utils/response.util";
 import { barangService } from "./barang.service";
 
 export const barangHandler = {
-    getAllBarangHandler: async ({ meta }: any) => {
+    getAllBarangHandler: async ({ query, meta }: any) => {
         meta.log.info("HANDLER: barangHandler.getAllBarangHandler hit")
-        const data = await barangService.getAllBarangService(meta)
+        
+        const data = await barangService.getAllBarangService(query, meta)
 
         return ApiResponseUtil.success({
             message: "Get All Data Success",

@@ -1,11 +1,15 @@
 import { BadRequestError, NotFoundError } from "../../common/errors/app.error";
 import { RequestMeta } from "../../common/interface/context";
+import { PaginationUtil } from "../../common/utils/pagination.util";
 import { barangRepository } from "./barang.repository";
 
 export const barangService = {
-    getAllBarangService: async (meta: RequestMeta) => {
-        meta.log.info("SERVICE: barangService.getAllBarangService called")
-        const data = await barangRepository.getAllBarangRepository()
+    getAllBarangService: async (query: any, meta: RequestMeta) => {
+        meta.log.info(query, "SERVICE: barangService.getAllBarangService called")
+
+        const paginationObject = PaginationUtil.convertQueryToObject(query)
+
+        const data = await barangRepository.getAllBarangRepository(paginationObject)
         return data
     },
     getBarangByUuidService: async (uuid: string, meta: RequestMeta) => {
