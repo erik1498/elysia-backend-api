@@ -1,6 +1,7 @@
 import Elysia from "elysia";
 import { ForbiddenError, UnauthorizedError } from "../errors/app.error";
 import { cache } from "../config/storage/redis.config";
+import { RequestMeta } from "../interface/context";
 
 export const jwtMiddleware = (app: Elysia) =>
     app
@@ -30,10 +31,14 @@ export const jwtMiddleware = (app: Elysia) =>
 
             if (!payload) throw new UnauthorizedError
 
-            meta.userUuid = payload.sub
-            meta.log = meta.log.child({ user: payload.sub })
+            const authMeta = {
+                ...meta,
+                userUuid: payload.sub,
+                userRoles: payload.roles,
+                log: meta.log.child({ user: payload.sub })
+            } as RequestMeta
 
             return {
-                meta
+                meta: authMeta
             }
         })
