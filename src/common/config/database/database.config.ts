@@ -9,9 +9,7 @@ const pool = createPool({
     queueLimit: 0
 });
 
-export const db = drizzle(pool, {
-    logger: true
-});
+export const db = drizzle(pool);
 
 export const checkDbConnection = async () => {
     try {
