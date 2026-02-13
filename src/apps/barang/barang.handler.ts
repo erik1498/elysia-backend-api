@@ -9,8 +9,7 @@ export const barangHandler = {
 
         return ApiResponseUtil.success({
             message: "Get All Data Success",
-            data: data.data,
-            meta: data.meta
+            data
         })
     },
     getBarangByUuidHandler: async ({ params, meta }: any) => {
