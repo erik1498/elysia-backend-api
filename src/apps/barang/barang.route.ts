@@ -4,8 +4,8 @@ import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
 import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
 import { rateLimiter } from "../../common/middlewares/rate-limit.middleware";
-import { PaginationQueryRequestSchema } from "../../common/schemas/pagination.schema";
 import { paginationQueryMacro } from "../../common/macros/pagination.plugins";
+import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../../common/schemas/pagination.schema";
 
 export const barangRoute = (app: Elysia) => {
     return app
@@ -17,15 +17,15 @@ export const barangRoute = (app: Elysia) => {
                 .get("/", barangHandler.getAllBarangHandler, {
                     query: PaginationQueryRequestSchema,
                     paginationQueryValidate: {
-                        sortKeys: ["harga", "nama"],
-                        filterKeys: ["harga"]
+                        filterKeys: ["harga"],
+                        sortKeys: ["harga", "nama"]
                     },
                     detail: {
                         tags: ["Barang"],
                         summary: "Get All Data Barang"
                     },
                     response: {
-                        200: BaseResponseSchema(t.Array(BarangResponseSchema))
+                        200: PaginatedResponseSchema(BarangResponseSchema)
                     }
                 })
                 .get("/:uuid", barangHandler.getBarangByUuidHandler, {
