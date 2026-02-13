@@ -4,14 +4,22 @@ import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
 import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
 import { rateLimiter } from "../../common/middlewares/rate-limit.middleware";
+import { PaginationQueryRequestSchema } from "../../common/schemas/pagination.schema";
+import { paginationQueryMacro } from "../../common/macros/pagination.plugins";
 
 export const barangRoute = (app: Elysia) => {
     return app
         .group("/barang", (group) =>
             group
                 .use(jwtMiddleware)
+                .use(paginationQueryMacro)
                 .use(rateLimiter("barang", 60, 60))
                 .get("/", barangHandler.getAllBarangHandler, {
+                    query: PaginationQueryRequestSchema,
+                    paginationQueryValidate: {
+                        sortKeys: ["harga", "nama"],
+                        filterKeys: ["harga"]
+                    },
                     detail: {
                         tags: ["Barang"],
                         summary: "Get All Data Barang"

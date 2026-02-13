@@ -1,17 +1,63 @@
 import { barangTable } from "./barang.model";
 import { db } from "../../common/config/database/database.config";
-import { and, eq, InferInsertModel } from "drizzle-orm";
+import { and, asc, desc, eq, InferInsertModel, like, or, SQL } from "drizzle-orm";
 import { RequestMeta } from "../../common/interface/context";
 import { auditLogTable } from "../audit/audit.model";
 
 export const barangRepository = {
-    getAllBarangRepository: async () => {
-        return await db
+    getAllBarangRepository: async (paginationObject: any) => {
+
+        let filterConditions: SQL[] = [];
+        let searchConditions: SQL[] = [];
+        let orderSelectors: SQL[] = [];
+
+        const searchAllowedColumn = ["nama"] as const;
+
+        type Barang = typeof barangTable.$inferSelect;
+        type BarangColumnName = keyof Barang;
+
+        if (paginationObject.search) {
+            searchConditions = searchAllowedColumn.map((key) => {
+                const column = barangTable[key as BarangColumnName];
+                return like(column, `%${paginationObject.search}%`);
+            });
+        }
+
+        if (paginationObject.filter) {
+            Object.entries(paginationObject.filter).forEach(([key, value]) => {
+                if (key in barangTable && value !== undefined && value !== null) {
+                    const column = barangTable[key as BarangColumnName];
+                    filterConditions.push(eq(column as any, value));
+                }
+            })
+        }
+
+        if (paginationObject.sort) {
+            Object.entries(paginationObject.sort).forEach(([key, direction]) => {
+                const column = barangTable[key as BarangColumnName];
+                if (column) {
+                    orderSelectors.push(
+                        direction === 'desc' ? desc(column) : asc(column)
+                    );
+                }
+            });
+        }
+
+        const data = await db
             .select()
             .from(barangTable)
             .where(
-                eq(barangTable.enabled, true)
+                and(
+                    or(...searchConditions)!,
+                    ...filterConditions,
+                    eq(barangTable.enabled, true)
+                )
             )
+            .orderBy(...orderSelectors)
+            .limit(paginationObject.size)
+            .offset((paginationObject.page - 1) * paginationObject.size)
+
+        return data
     },
     getBarangByUuidRepository: async (uuid: string) => {
         const [data] = await db

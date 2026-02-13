@@ -1,8 +1,14 @@
+interface ValidationErrorDetail {
+    field: string;
+    message: string;
+}
+
 export class AppError extends Error {
     constructor(
         public statusCode: number,
         public message: string,
-        public code: string
+        public code: string,
+        public details?: ValidationErrorDetail[]
     ) {
         super(message);
         this.name = 'AppError';
@@ -36,5 +42,15 @@ export class ForbiddenError extends AppError {
 export class TooManyRequestError extends AppError {
     constructor(message = "Too Many Request") {
         super(429, message, "TOO_MANY_REQUEST");
+    }
+}
+
+export class ValidationError extends AppError {
+    constructor(
+        details: ValidationErrorDetail[],
+        message = "Invalid Request"
+    ) {
+        super(422, message, "VALIDATION", details);
+        this.name = 'ValidationError';
     }
 }
