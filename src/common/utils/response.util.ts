@@ -1,8 +1,9 @@
 export const ApiResponseUtil = {
-    success: <T>({ data, message = "Request success" }: { data?: T, message?: string }) => ({
+    success: <T, M>({ data, message = "Request success", meta }: { data?: T, message?: string, meta?: M }) => ({
         success: true,
         message,
-        data
+        data,
+        meta
     }),
 
     error: ({ message = "An error occurred", code, details }: { message?: string, code: string, details?: any }) => ({
