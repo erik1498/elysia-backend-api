@@ -4,7 +4,7 @@ import Elysia, { t } from "elysia";
 import { barangHandler } from "./barang.handler";
 import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
 import { rateLimiter } from "../../common/middlewares/rate-limit.middleware";
-import { paginationQueryMacro } from "../../common/macros/pagination.plugins";
+import { paginationPlugin } from "../../common/plugins/pagination.plugin";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../../common/schemas/pagination.schema";
 import { IdempotencyHeaderSchema } from "../../common/schemas/idempotency.schema";
 import { idempotencyMiddleware } from "../../common/middlewares/idempotency.middleware";
@@ -15,7 +15,7 @@ export const barangRoute = (app: Elysia) => {
             group
                 .use(idempotencyMiddleware)
                 .use(jwtMiddleware)
-                .use(paginationQueryMacro)
+                .use(paginationPlugin)
                 .use(rateLimiter("barang", 60, 60))
                 .get("/", barangHandler.getAllBarangHandler, {
                     query: PaginationQueryRequestSchema,
