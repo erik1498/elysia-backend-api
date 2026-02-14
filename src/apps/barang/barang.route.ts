@@ -6,11 +6,14 @@ import { jwtMiddleware } from "../../common/middlewares/jwt.middleware";
 import { rateLimiter } from "../../common/middlewares/rate-limit.middleware";
 import { paginationQueryMacro } from "../../common/macros/pagination.plugins";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../../common/schemas/pagination.schema";
+import { IdempotencyHeaderSchema } from "../../common/schemas/idempotency.schema";
+import { idempotencyMiddleware } from "../../common/middlewares/idempotency.middleware";
 
 export const barangRoute = (app: Elysia) => {
     return app
         .group("/barang", (group) =>
             group
+                .use(idempotencyMiddleware)
                 .use(jwtMiddleware)
                 .use(paginationQueryMacro)
                 .use(rateLimiter("barang", 60, 60))
@@ -43,6 +46,7 @@ export const barangRoute = (app: Elysia) => {
                 .post("/", barangHandler.createBarangHandler, {
                     roles: ["super_admin"],
                     body: BarangBodySchema,
+                    headers: IdempotencyHeaderSchema,
                     detail: {
                         tags: ["Barang"],
                         summary: "Create Data Barang"

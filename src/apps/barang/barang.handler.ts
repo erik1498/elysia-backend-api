@@ -1,10 +1,11 @@
+import { cache } from "../../common/config/storage/redis.config";
 import { ApiResponseUtil } from "../../common/utils/response.util";
 import { barangService } from "./barang.service";
 
 export const barangHandler = {
     getAllBarangHandler: async ({ query, meta }: any) => {
         meta.log.info("HANDLER: barangHandler.getAllBarangHandler hit")
-        
+
         const data = await barangService.getAllBarangService(query, meta)
 
         return ApiResponseUtil.success({
@@ -22,15 +23,21 @@ export const barangHandler = {
             data
         })
     },
-    createBarangHandler: async ({ body, meta, set }: any) => {
+    createBarangHandler: async ({ request: { headers }, body, meta, set }: any) => {
         meta.log.info("HANDLER: barangHandler.createBarangHandler hit")
         const created = await barangService.createBarangService(body, meta)
         set.status = 201
 
-        return ApiResponseUtil.success({
+        const response = ApiResponseUtil.success({
             message: "Create Data Success",
             data: created
         })
+
+        const idmpKey = headers.get("x-idempotency-key")
+
+        await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800)
+
+        return response
     },
     updateBarangHandler: async ({ params, body, meta, set }: any) => {
         meta.log.info("HANDLER: barangHandler.updateBarangHandler hit")
