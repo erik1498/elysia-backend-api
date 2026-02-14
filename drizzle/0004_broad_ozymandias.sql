@@ -1,0 +1,1 @@
+ALTER TABLE `audit_log_tab` ADD `request_id` varchar(36) NOT NULL;
