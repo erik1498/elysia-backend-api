@@ -14,6 +14,7 @@ export const barangTable = mysqlTable("barang_tab", {
         .default(sql`CURRENT_TIMESTAMP`)
         .onUpdateNow(),
     createdBy: varchar("created_by", { length: 36 }).notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 36 }).unique(),
     updatedBy: varchar("updated_by", { length: 36 }).default("Empty"),
     enabled: boolean("enabled").default(true)
 });

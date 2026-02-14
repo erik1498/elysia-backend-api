@@ -3,6 +3,7 @@ export interface RequestMeta {
     userAgent: string;
     userUuid: string;
     userRoles: string[];
+    idempotencyKey: string;
     ipAddress: string;
     requestId: string;
     logPath: string;
