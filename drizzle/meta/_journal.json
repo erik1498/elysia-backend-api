@@ -22,6 +22,20 @@
       "when": 1770908639557,
       "tag": "0002_breezy_azazel",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1771053596501,
+      "tag": "0003_cuddly_oracle",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1771054417207,
+      "tag": "0004_broad_ozymandias",
+      "breakpoints": true
     }
   ]
 }

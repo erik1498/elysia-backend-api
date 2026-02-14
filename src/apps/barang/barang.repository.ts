@@ -72,8 +72,13 @@ export const barangRepository = {
         return data
     },
     createBarangRepository: async (data: InferInsertModel<typeof barangTable>, meta: RequestMeta) => {
-        const createdResult = await db.transaction(async (tx) => {
-            const created = await tx
+
+        const uuid = crypto.randomUUID()
+        data.uuid = uuid
+        data.idempotencyKey = meta.idempotencyKey
+
+        await db.transaction(async (tx) => {
+            await tx
                 .insert(barangTable)
                 .values({
                     ...data,
@@ -88,14 +93,27 @@ export const barangRepository = {
                     entityUuid: data.uuid,
                     ipAddress: meta.ipAddress,
                     newData: data,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })
-
-            return created
+            return
+        }).catch((err) => {
+            if (err.cause.errno === 1062) {
+                meta.log.error(`REPO: DUPLICATE ERROR (ER_DUP_ENTRY) idempotencyKey INSERT ON DB, idmp:${meta.idempotencyKey} IS NOT FOUND`)
+            }
         })
 
-        return createdResult
+        const [created] = await db
+            .select()
+            .from(barangTable)
+            .where(
+                and(
+                    eq(barangTable.idempotencyKey, meta.idempotencyKey),
+                )
+            )
+
+        return created
     },
     updateBarangRepository: async (uuid: string, data: InferInsertModel<typeof barangTable>, meta: RequestMeta) => {
         const updatedResult = await db.transaction(async (tx) => {
@@ -132,6 +150,7 @@ export const barangRepository = {
                     ipAddress: meta.ipAddress,
                     newData: data,
                     oldData: oldData,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })
@@ -180,6 +199,7 @@ export const barangRepository = {
                         enabled: false
                     },
                     oldData: oldData,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })

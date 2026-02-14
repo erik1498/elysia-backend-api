@@ -10,6 +10,7 @@ export const auditLogTable = mysqlTable("audit_log_tab", {
     entityUuid: varchar("entity_uuid", { length: 36 }),
     oldData: json("old_data"),
     newData: json("new_data"),
+    requestId: varchar("request_id", { length: 36 }).notNull(),
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: varchar("user_agent", { length: 512 }),
     createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`)

@@ -67,10 +67,25 @@ export const userService = {
             roles: roles.map(x => x.nama)
         }
 
-        const accessToken = await accessTokenConfig.sign(accessTokenPayload)
+        const refreshTokenPayload = {
+            sub: tokenOnDB.userUuid
+        }
+
+        const newAccessToken = await accessTokenConfig.sign(accessTokenPayload)
+        const newRefreshToken = await refreshTokenConfig.sign(refreshTokenPayload)
+
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + 7)
+
+        await tokenRepository.createUserTokenRepository({
+            userUuid: tokenOnDB.userUuid,
+            expiresAt,
+            refreshToken: newRefreshToken,
+        })
 
         return {
-            accessToken
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken
         }
     },
     registerService: async (data: any, meta: any) => {

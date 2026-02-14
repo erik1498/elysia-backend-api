@@ -54,27 +54,20 @@ Mengeksekusi file migrasi untuk memperbarui struktur tabel di MySQL.
 bun db:migrate
 ```
 
-### Langkah C: Inisialisasi Akun Administrator
+### Langkah C: Inisialisasi Data Otomatis (Seed)
 
-Setelah tabel terbuat, Anda perlu memasukkan data master (Admin & Role). Anda bisa melakukannya melalui **Drizzle Studio** (Visual) atau SQL Client:
+Gunakan perintah berikut untuk mengisi data Roles dan Admin User secara otomatis:
 
-```sql
--- 1. Tambah User Admin (Password: admin)  
-INSERT INTO user_tab (uuid, nama, username, password) VALUES  ('5f522ed1-8a70-4c10-8ce4-b89c47b0a240', 'ADMINISTRATOR', 'admin', '$2b$10$Zi/A.A4IfmBVpoLSG0ORx.jFgofn4dXfUWyAY88aGAFsMVe77VYYO');  
-
--- 2. Tambah Master Roles  
-INSERT INTO role_tab (uuid, nama) VALUES  ('c0f29810-dfe4-11f0-a259-145afc5d4423', 'super_admin'),  ('e6df4ca8-dff1-11f0-a259-145afc5d4423', 'accounting');
-
--- 3. Hubungkan User ke Role
-INSERT INTO user_role_tab (uuid, user_uuid, role_uuid) VALUES   ('4cb0c890-05cc-11f1-8d2c-145afc5d4423', '5f522ed1-8a70-4c10-8ce4-b89c47b0a240', 'c0f29810-dfe4-11f0-a259-145afc5d4423'),  ('5c8b83e9-05cc-11f1-8d2c-145afc5d4423', '5f522ed1-8a70-4c10-8ce4-b89c47b0a240', 'e6df4ca8-dff1-11f0-a259-145afc5d4423');   `
+```bash
+bun db:seed
 ```
 
-🚀 3. Menjalankan Aplikasi
+3. Menjalankan Aplikasi
 --------------------------
 
 Aplikasi memiliki dua mode operasi utama:
 
-### 🟢 Mode Pengembangan (Development)
+### Mode Pengembangan (Development)
 
 Dilengkapi dengan fitur **Hot Reload**. Server otomatis restart setiap kali ada perubahan kode.
 
@@ -82,34 +75,41 @@ Dilengkapi dengan fitur **Hot Reload**. Server otomatis restart setiap kali ada 
 bun dev
 ```
 
-### 🔵 Mode Produksi (Production)
+### Mode Produksi (Production)
 
 Dijalankan untuk performa maksimal. Pastikan NODE\_ENV=production sudah disetel di .env.
 
 ```bash
-# Jalankan aplikasi mode produksi
 bun start
 ```
 
-📋 Ringkasan Perintah (Cheat Sheet)
+Ringkasan Perintah (Cheat Sheet)
 -----------------------------------
-| Kategori | Tugas                | Perintah        |
-|----------|----------------------|-----------------|
-| Setup    | Install Dependencies | bun install     |
-| Database | Buat File Migrasi    | bun db:generate |
-| Database | Eksekusi ke Server   | bun db:migrate  |
-| Runtime  | Mode Development     | bun dev         |
-| Runtime  | Mode Produksi        | bun start       |
+| Kategori | Tugas                     | Perintah        |
+|----------|---------------------------|-----------------|
+| Setup    | Install Dependencies      | bun install     |
+| Database | Buat File Migrasi         | bun db:generate |
+| Database | Eksekusi ke Server        | bun db:migrate  |
+| Database | Isi Data Admin & Roles    | bun db:seed     |
+| Runtime  | Mode Development          | bun dev         |
+| Runtime  | Mode Produksi             | bun start       |
 
-🚨 Troubleshooting (Prinsip Fail-Fast)
+Troubleshooting (Prinsip Fail-Fast)
 --------------------------------------
 
 Aplikasi ini menerapkan prinsip **Fail-Fast**. Jika aplikasi langsung berhenti setelah dijalankan, periksa hal berikut:
 
 1.  **MySQL Status**: Pastikan MySQL aktif di port 3306 dan database sudah dibuat secara manual sebelum menjalankan migrasi.
     
-2.  **Redis Readiness**: Tanpa Redis, sistem _Rate Limiting_ dan _Blacklist Token_ tidak bisa diinisialisasi, sehingga aplikasi akan mematikan diri secara otomatis.
+2.  **Redis Readiness**: Tanpa Redis, sistem _Rate Limiting_, _Blacklist Token_, _Idempotency_Key_ tidak bisa diinisialisasi, sehingga aplikasi akan mematikan diri secara otomatis.
     
 3.  **Migration Check**: Jika muncul error Relation "table\_name" does not exist, jalankan kembali bun db:migrate.
     
 4.  **JWT Secret**: Jika login gagal terus-menerus, pastikan JWT\_SECRET di .env sudah terisi dan cukup panjang.
+
+
+
+Saran Tambahan
+-------------------------------------
+
+Jika Anda ingin melihat data yang baru saja dimasukkan oleh script seed tanpa menggunakan terminal, Anda bisa menjalankan `bun db:studio`. Ini akan membuka dashboard visual di browser Anda untuk mengelola isi tabel.

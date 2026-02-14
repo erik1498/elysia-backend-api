@@ -18,5 +18,3 @@ export const checkRedisConnection = async () => {
         process.exit(1); 
     }
 };
-
-export const redisPlugin = (app: Elysia) => app.decorate("cache", cache);
