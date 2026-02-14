@@ -39,16 +39,13 @@ export const barangService = {
     },
     createBarangService: async (data: any, meta: RequestMeta) => {
         meta.log.info(data, "SERVICE: barangService.createBarangService called")
-        const uuid = crypto.randomUUID()
-        data.uuid = uuid
-
         const created = await barangRepository.createBarangRepository(data, meta)
 
-        if (!created || created[0].affectedRows == 0) {
+        if (!created) {
             throw new BadRequestError
         }
 
-        return await barangRepository.getBarangByUuidRepository(uuid)
+        return created
     },
     updateBarangService: async (uuid: string, data: any, meta: RequestMeta) => {
         meta.log.info({ uuid, data }, "SERVICE: barangService.updateBarangService called")
