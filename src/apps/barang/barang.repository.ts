@@ -109,6 +109,7 @@ export const barangRepository = {
                     entityUuid: data.uuid,
                     ipAddress: meta.ipAddress,
                     newData: data,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })
@@ -165,6 +166,7 @@ export const barangRepository = {
                     ipAddress: meta.ipAddress,
                     newData: data,
                     oldData: oldData,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })
@@ -213,6 +215,7 @@ export const barangRepository = {
                         enabled: false
                     },
                     oldData: oldData,
+                    requestId: meta.requestId,
                     userAgent: meta.userAgent,
                     userUuid: meta.userUuid
                 })
