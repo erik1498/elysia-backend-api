@@ -4,9 +4,8 @@ import { cache } from "../config/storage/redis.config";
 
 export const rateLimiter = (groupName: string, limit: number, duration: number) => (app: Elysia) =>
     app
-        .decorate("cache", cache)
-        .onBeforeHandle(async ({ request, set, cache, meta }: any) => {
-            const id = meta.userUuid || request.headers.get('x-forwarded-for') || 'anonymous';
+        .onBeforeHandle(async ({ set, meta }: any) => {
+            const id = meta.userUuid || meta.ipAddress;
 
             const key = `rl:${groupName}:${id}`;
 
