@@ -13,13 +13,6 @@ export const PaginationUtil = {
         return result;
     },
     keyOnQueryCheck: (params: { type: string, allowedKeys: string[], query: string }) => {
-        if (params.allowedKeys.length === 0) {
-            throw new ValidationError([{
-                field: params.type,
-                message: `${params.type} is currently disabled for this resource.`
-            }])
-        }
-
         const queryObject = PaginationUtil.queryToObject(params.query)
 
         Object.keys(queryObject).forEach((key) => {
