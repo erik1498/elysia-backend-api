@@ -31,6 +31,14 @@ export const userHandler = {
 
         const token = await userService.refreshUserService(refreshTokenGet, accessTokenConfig, refreshTokenConfig, meta)
 
+        refreshToken.set({
+            value: token.refreshToken,
+            httpOnly: true,
+            path: '/',
+            secure: AppUtil.checkProductionType(),
+            sameSite: 'lax',
+        })
+
         return ApiResponseUtil.success({
             data: token
         })

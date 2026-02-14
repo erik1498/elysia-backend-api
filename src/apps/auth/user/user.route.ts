@@ -9,8 +9,8 @@ export const userRoute = (app: Elysia) => {
     return app
         .group("/user", group =>
             group
-                .group("", noAuthGroup =>
-                    noAuthGroup
+                .group("", loginGroup =>
+                    loginGroup
                         .use(rateLimiter("/auth", 3, 900))
                         .post("/login", userHandler.loginHandler, {
                             body: UserLoginBodySchema,
@@ -22,6 +22,10 @@ export const userRoute = (app: Elysia) => {
                                 200: BaseResponseSchema(UserLoginResponseSchema)
                             }
                         })
+                )
+                .group("", refreshTokenGroup =>
+                    refreshTokenGroup
+                        .use(rateLimiter("/refresh", 12, 900))
                         .get("/refresh", userHandler.refreshUserHandler, {
                             detail: {
                                 tags: ["User"],
@@ -32,7 +36,7 @@ export const userRoute = (app: Elysia) => {
                             }
                         })
                 )
-                .group("", group => 
+                .group("", group =>
                     group
                         .use(jwtMiddleware)
                         .post("/register", userHandler.registerHandler, {
