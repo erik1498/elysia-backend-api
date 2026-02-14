@@ -10,22 +10,7 @@ export const barangService = {
         const paginationObject = PaginationUtil.convertQueryToObject(query)
 
         const data = await barangRepository.getAllBarangRepository(paginationObject)
-
-        const totalPages = Math.ceil(data.dataCount[0].total / paginationObject.size)
-
-        return {
-            data: data.data,
-            meta: {
-                page: paginationObject.page,
-                size: paginationObject.size,
-                totalItems: data.dataCount[0].total,
-                totalPages,
-                hasNext: paginationObject.page < totalPages,
-                hasPrev: paginationObject.page > 1,
-                filterAllowedKeys: ["harga"],
-                sortAllowedKeys: ["harga", "nama"]
-            }
-        }
+        return data
     },
     getBarangByUuidService: async (uuid: string, meta: RequestMeta) => {
         meta.log.info({ uuid }, "SERVICE: barangService.getBarangByUuidService called")
