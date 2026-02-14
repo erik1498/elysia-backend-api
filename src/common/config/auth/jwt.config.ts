@@ -4,7 +4,7 @@ import Elysia from "elysia";
 export const accessTokenConfig = jwt({
     name: "accessTokenConfig",
     secret: Bun.env.JWT_ACCESS_TOKEN_SECRET || 'secret-key',
-    exp: '15m'
+    exp: '5m'
 })
 
 export const refreshTokenConfig = jwt({
