@@ -20,15 +20,15 @@ export const barangRoute = (app: Elysia) => {
                 .get("/", barangHandler.getAllBarangHandler, {
                     query: PaginationQueryRequestSchema,
                     paginationQueryValidate: {
-                        sortKeys: ["harga", "nama"],
-                        filterKeys: ["harga"]
+                        filterKeys: ["harga"],
+                        sortKeys: ["harga", "nama"]
                     },
                     detail: {
                         tags: ["Barang"],
                         summary: "Get All Data Barang"
                     },
                     response: {
-                        200: BaseResponseSchema(t.Array(BarangResponseSchema))
+                        200: PaginatedResponseSchema(BarangResponseSchema)
                     }
                 })
                 .get("/:uuid", barangHandler.getBarangByUuidHandler, {
