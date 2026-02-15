@@ -214,7 +214,7 @@ const modelRepository = {
 
             const deleted = await tx
                 .update(model)
-                .set({ ...data})
+                .set({ ...data })
                 .where(
                     and(
                         eq(model.uuid, uuid),
@@ -311,122 +311,119 @@ const modelService = {
 }
 
 
-export const createGenericRoute = <T extends TableConfig>(app: Elysia, config: RouteConfig<T>) => {
-    return app
-        .group(`/${config.prefix}`, (group) =>
-            group
-                .use(idempotencyMiddleware)
-                .use(jwtMiddleware)
-                .use(paginationPlugin)
-                .use(rateLimiter(config.prefix, 60, 60))
-                .get("/", async ({ query, meta }) => {
-                    meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
+export const createGenericRoute = <T extends TableConfig>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
+    return group
+        .use(idempotencyMiddleware)
+        .use(jwtMiddleware)
+        .use(paginationPlugin)
+        .use(rateLimiter(config.prefix, 60, 60))
+        .get("/", async ({ query, meta }) => {
+            meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
 
-                    const data = await modelService.getAllService(query, meta, config.model, config.name, config.filterKeys, config.sortKeys)
+            const data = await modelService.getAllService(query, meta, config.model, config.name, config.filterKeys, config.sortKeys)
 
-                    return ApiResponseUtil.success({
-                        message: "Get All Data Success",
-                        data: data.data,
-                        meta: data.meta
-                    })
-                }, {
-                    roles: config.roles.getAllDataRoles,
-                    query: PaginationQueryRequestSchema,
-                    paginationQueryValidate: {
-                        filterKeys: config.filterKeys,
-                        sortKeys: config.sortKeys
-                    },
-                    detail: {
-                        tags: config.tags,
-                        summary: `Get All Data ${config.name}`
-                    },
-                    response: {
-                        200: PaginatedResponseSchema(config.schemas.response)
-                    }
-                })
-                .get("/:uuid", async ({ params, meta }: any) => {
-                    meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
-                    const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name);
+            return ApiResponseUtil.success({
+                message: "Get All Data Success",
+                data: data.data,
+                meta: data.meta
+            })
+        }, {
+            roles: config.roles.getAllDataRoles,
+            query: PaginationQueryRequestSchema,
+            paginationQueryValidate: {
+                filterKeys: config.filterKeys,
+                sortKeys: config.sortKeys
+            },
+            detail: {
+                tags: config.tags,
+                summary: `Get All Data ${config.name}`
+            },
+            response: {
+                200: PaginatedResponseSchema(config.schemas.response)
+            }
+        })
+        .get("/:uuid", async ({ params, meta }: any) => {
+            meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
+            const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name);
 
-                    return ApiResponseUtil.success({
-                        message: "Get Data Success",
-                        data
-                    })
-                }, {
-                    params: t.Object({
-                        uuid: t.String({ format: 'uuid' })
-                    }),
-                    detail: {
-                        tags: config.tags,
-                        summary: `Get Data ${config.name}`
-                    },
-                    response: {
-                        200: BaseResponseSchema(config.schemas.response)
-                    }
-                })
-                .post("/", async ({ request: { headers }, body, meta, set }) => {
-                    meta.log.info(`HANDLER: ${config.name}Handler.createHandler hit`)
-                    const created = await modelService.createService(body, meta, config.model, config.name, config.entityName)
-                    set.status = 201
+            return ApiResponseUtil.success({
+                message: "Get Data Success",
+                data
+            })
+        }, {
+            params: t.Object({
+                uuid: t.String({ format: 'uuid' })
+            }),
+            detail: {
+                tags: config.tags,
+                summary: `Get Data ${config.name}`
+            },
+            response: {
+                200: BaseResponseSchema(config.schemas.response)
+            }
+        })
+        .post("/", async ({ request: { headers }, body, meta, set }) => {
+            meta.log.info(`HANDLER: ${config.name}Handler.createHandler hit`)
+            const created = await modelService.createService(body, meta, config.model, config.name, config.entityName)
+            set.status = 201
 
-                    const response = ApiResponseUtil.success({
-                        message: "Create Data Success",
-                        data: created
-                    })
+            const response = ApiResponseUtil.success({
+                message: "Create Data Success",
+                data: created
+            })
 
-                    const idmpKey = headers.get("x-idempotency-key")
+            const idmpKey = headers.get("x-idempotency-key")
 
-                    await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800)
+            await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800)
 
-                    return response
-                }, {
-                    roles: config.roles.getDataRoles,
-                    body: config.schemas.body,
-                    headers: IdempotencyHeaderSchema,
-                    detail: {
-                        tags: config.tags,
-                        summary: `Create Data ${config.name}`
-                    },
-                    response: {
-                        201: BaseResponseSchema(config.schemas.response)
-                    }
-                })
-                .put("/:uuid", async ({ params, body, meta, set }: any) => {
-                    meta.log.info(`HANDLER: ${config.name}Handler.updateHandler hit`)
-                    const updated = await modelService.updateService(params.uuid, body, meta, config.model, config.name, config.entityName)
-                    set.status = 200
+            return response
+        }, {
+            roles: config.roles.getDataRoles,
+            body: config.schemas.body,
+            headers: IdempotencyHeaderSchema,
+            detail: {
+                tags: config.tags,
+                summary: `Create Data ${config.name}`
+            },
+            response: {
+                201: BaseResponseSchema(config.schemas.response)
+            }
+        })
+        .put("/:uuid", async ({ params, body, meta, set }: any) => {
+            meta.log.info(`HANDLER: ${config.name}Handler.updateHandler hit`)
+            const updated = await modelService.updateService(params.uuid, body, meta, config.model, config.name, config.entityName)
+            set.status = 200
 
-                    return ApiResponseUtil.success({
-                        message: "Update Data Success",
-                        data: updated
-                    })
-                }, {
-                    roles: config.roles.updateDataRoles,
-                    params: t.Object({
-                        uuid: t.String({ format: 'uuid' })
-                    }),
-                    body: config.schemas.body,
-                    detail: {
-                        tags: config.tags,
-                        summary: `Update Data ${config.name}`
-                    },
-                    response: {
-                        200: BaseResponseSchema(config.schemas.response)
-                    }
-                })
-                .delete("/:uuid", async ({ params, meta, set }: any) => {
-                    meta.log.info(`HANDLER: ${config.name}Handler.deleteHandler hit`)
-                    await modelService.deleteService(params.uuid, meta, config.model, config.name, config.entityName)
-                    set.status = 204
-                }, {
-                    roles: config.roles.deleteDataRoles,
-                    params: t.Object({
-                        uuid: t.String({ format: 'uuid' })
-                    }),
-                    detail: {
-                        tags: config.tags,
-                        summary: `Delete Data ${config.name} Barang`
-                    }
-                })
-        );
+            return ApiResponseUtil.success({
+                message: "Update Data Success",
+                data: updated
+            })
+        }, {
+            roles: config.roles.updateDataRoles,
+            params: t.Object({
+                uuid: t.String({ format: 'uuid' })
+            }),
+            body: config.schemas.body,
+            detail: {
+                tags: config.tags,
+                summary: `Update Data ${config.name}`
+            },
+            response: {
+                200: BaseResponseSchema(config.schemas.response)
+            }
+        })
+        .delete("/:uuid", async ({ params, meta, set }: any) => {
+            meta.log.info(`HANDLER: ${config.name}Handler.deleteHandler hit`)
+            await modelService.deleteService(params.uuid, meta, config.model, config.name, config.entityName)
+            set.status = 204
+        }, {
+            roles: config.roles.deleteDataRoles,
+            params: t.Object({
+                uuid: t.String({ format: 'uuid' })
+            }),
+            detail: {
+                tags: config.tags,
+                summary: `Delete Data ${config.name} Barang`
+            }
+        })
 };
