@@ -1,16 +1,18 @@
-import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
+import { MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
+import { TSchema } from "elysia";
 
-export interface RouteConfig {
+export interface RouteConfig<T extends TableConfig> {
     name: string;
     entityName: string;
     prefix: string;
-    model: MySqlTableWithColumns<any>;
+    model: MySqlTableWithColumns<T>;
     filterKeys: string[];
     sortKeys: string[];
+    searchKeys: string[];
     tags: string[];
     schemas: {
-        body: any;
-        response: any;
+        body: TSchema;
+        response: TSchema;
     };
     roles: {
         getAllDataRoles: string[],

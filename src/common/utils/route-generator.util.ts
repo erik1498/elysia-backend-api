@@ -1,4 +1,4 @@
-import Elysia, { t } from "elysia";
+import Elysia, { Static, t } from "elysia";
 import { RouteConfig } from "../interface/route-generator.interface";
 import { idempotencyMiddleware } from "../middlewares/idempotency.middleware";
 import { jwtMiddleware } from "../middlewares/jwt.middleware";
@@ -10,7 +10,7 @@ import { and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
-import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
+import { MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
 import { cache } from "../config/storage/redis.config";
 import { auditLogTable } from "../../apps/audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
@@ -18,7 +18,13 @@ import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
 
 const modelRepository = {
-    getAllRepository: async (paginationObject: any, model: MySqlTableWithColumns<any>) => {
+    getAllRepository: async <T extends TableConfig>(paginationObject: {
+        page: number,
+        size: number,
+        search?: string,
+        filter?: Record<string, string>,
+        sort?: Record<string, string>
+    }, model: MySqlTableWithColumns<T>) => {
 
         let filterConditions: SQL[] = [];
         let searchConditions: SQL[] = [];
@@ -86,7 +92,7 @@ const modelRepository = {
             dataCount
         }
     },
-    getByUuidRepository: async (uuid: string, model: MySqlTableWithColumns<any>) => {
+    getByUuidRepository: async <T extends TableConfig>(uuid: string, model: MySqlTableWithColumns<T>) => {
         const [data] = await db
             .select()
             .from(model)
@@ -98,7 +104,7 @@ const modelRepository = {
             ).limit(1)
         return data
     },
-    createRepository: async (data: any, meta: RequestMeta, model: MySqlTableWithColumns<any>, entityName: string) => {
+    createRepository: async <T extends TableConfig>(data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid
@@ -142,7 +148,7 @@ const modelRepository = {
 
         return created
     },
-    updateRepository: async (uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<any>, entityName: string) => {
+    updateRepository: async <T extends TableConfig>(uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
         const updatedResult = await db.transaction(async (tx) => {
 
             const [oldData] = await tx
@@ -187,7 +193,12 @@ const modelRepository = {
 
         return updatedResult
     },
-    deleteRepository: async (uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<any>, entityName: string) => {
+    deleteRepository: async <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+
+        const data = {
+            enabled: false,
+            updatedBy: meta.userUuid
+        } as any
 
         const deletedResult = await db.transaction(async (tx) => {
 
@@ -203,10 +214,7 @@ const modelRepository = {
 
             const deleted = await tx
                 .update(model)
-                .set({
-                    enabled: false,
-                    updatedBy: meta.userUuid
-                })
+                .set({ ...data})
                 .where(
                     and(
                         eq(model.uuid, uuid),
@@ -239,7 +247,7 @@ const modelRepository = {
 }
 
 const modelService = {
-    getAllService: async (query: any, meta: RequestMeta, model: MySqlTableWithColumns<any>, name: string, filterKeys: string[], sortKeys: string[]) => {
+    getAllService: async <T extends TableConfig>(query: Static<typeof PaginationQueryRequestSchema>, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, filterKeys: string[], sortKeys: string[]) => {
         meta.log.info(query, `SERVICE: ${name}Service.getAllService called`)
 
         const paginationObject = PaginationUtil.convertQueryToObject(query)
@@ -262,7 +270,7 @@ const modelService = {
             }
         }
     },
-    getByUuidService: async (uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<any>, name: string) => {
+    getByUuidService: async  <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.getBarangByUuidService called`)
         const data = await modelRepository.getByUuidRepository(uuid, model)
 
@@ -272,7 +280,7 @@ const modelService = {
 
         return data
     },
-    createService: async (data: any, meta: RequestMeta, model: MySqlTableWithColumns<any>, name: string, entityName: string) => {
+    createService: async  <T extends TableConfig>(data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info(data, `SERVICE: ${name}Service.createBarangService called`)
         const created = await modelRepository.createRepository(data, meta, model, entityName)
 
@@ -282,7 +290,7 @@ const modelService = {
 
         return created
     },
-    updateService: async (uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<any>, name: string, entityName: string) => {
+    updateService: async  <T extends TableConfig>(uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info({ uuid, data }, `SERVICE: ${name}Service.updateService called`)
         const updated = await modelRepository.updateRepository(uuid, data, meta, model, entityName)
 
@@ -292,7 +300,7 @@ const modelService = {
 
         return await modelRepository.getByUuidRepository(uuid, model)
     },
-    deleteService: async (uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<any>, name: string, entityName: string) => {
+    deleteService: async  <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.deleteBarangService called`)
         const deleted = await modelRepository.deleteRepository(uuid, meta, model, entityName)
 
@@ -303,7 +311,7 @@ const modelService = {
 }
 
 
-export const createGenericRoute = (app: Elysia, config: RouteConfig) => {
+export const createGenericRoute = <T extends TableConfig>(app: Elysia, config: RouteConfig<T>) => {
     return app
         .group(`/${config.prefix}`, (group) =>
             group
