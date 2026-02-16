@@ -1,6 +1,6 @@
 import { eq, InferInsertModel } from "drizzle-orm";
 import { tokenTable } from "./token.model";
-import { db } from "../../../common/config/database/database.config";
+import { db } from "../../config/database/database.config";
 
 export const tokenRepository = {
     createUserTokenRepository: async (data: InferInsertModel<typeof tokenTable>) => {

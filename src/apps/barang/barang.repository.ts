@@ -2,7 +2,7 @@ import { barangTable } from "./barang.model";
 import { db } from "../../common/config/database/database.config";
 import { and, asc, desc, eq, InferInsertModel, like, or, sql, SQL } from "drizzle-orm";
 import { RequestMeta } from "../../common/interface/context";
-import { auditLogTable } from "../audit/audit.model";
+import { auditLogTable } from "../../common/audit/audit.model";
 
 export const barangRepository = {
     getAllBarangRepository: async (paginationObject: any) => {

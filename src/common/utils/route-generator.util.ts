@@ -12,7 +12,7 @@ import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schema
 import { db } from "../config/database/database.config";
 import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
 import { cache } from "../config/storage/redis.config";
-import { auditLogTable } from "../../apps/audit/audit.model";
+import { auditLogTable } from "../audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
