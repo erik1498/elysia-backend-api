@@ -2,50 +2,68 @@ import { AnyMySqlColumn, MySqlTableWithColumns, TableConfig } from "drizzle-orm/
 import { TSchema } from "elysia";
 import { BaseColumns } from "../models/base.model";
 
+/**
+ * Represents the required key set for any table utilizing the BaseColumns.
+ * Ensures that the 'id', 'uuid', 'createdAt', etc., are present.
+ */
 type BaseKeys = keyof typeof BaseColumns;
 
+/**
+ * An extension of the Drizzle TableConfig.
+ * This interface mandates that any table passed to the generic generator 
+ * MUST include the standard BaseColumns (Audit trail, identity, and soft-delete fields).
+ * * @interface TableWithBase
+ */
 export interface TableWithBase extends TableConfig {
     columns: Record<BaseKeys, AnyMySqlColumn> & TableConfig["columns"];
 }
 
 /**
- * Creates a new record in the table and records the activity to the audit log.
- * * @template T - Table configuration type that must implement {@link BaseColumns}.
- * @param data - The data object to be inserted, matching the table schema.
- * @param meta - Request metadata for audit trail (User UUID, IP Address, Request ID, etc.).
- * @param model - Drizzle ORM MySQL table instance.
- * * **IMPORTANT**: The model must be defined by spreading `...BaseColumns`.
- * @example
- * ```typescript
-    import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
-    import { BaseColumns } from "../../common/schemas/base-model.schema";
-    export const itemTable = mysqlTable("item_tab", {
-    column1: varchar("column_1", { length: 255 }).notNull(),
-        ...BaseColumns
-    });
- * ```
- * * @param entityName - The name of the entity (e.g., "Item") for log entries.
- * @returns Returns the database execution result of the insert operation.
- * @throws Throws an error if a duplicate entry is found or connection fails.
- * * @example
- * ```typescript
- * await createRepository(body, meta, itemTable, "Item");
- * ```
+ * The configuration object required to generate a complete set of RESTful routes.
+ * This acts as the "Blueprints" for the Generic Route Generator.
+ * * @template T - A Drizzle table that satisfies the {@link TableWithBase} requirements.
  */
-
 export interface RouteConfig<T extends TableWithBase> {
+    /** The display name of the entity (e.g., 'User', 'Product'). Used for logging. */
     name: string;
+    /** The system identifier for the entity (e.g., 'USER_MGMT'). Used for Audit Logs. */
     entityName: string;
+    /** The URL path segment for the route group (e.g., '/users'). */
     prefix: string;
+    /**
+     * 
+     * The Drizzle ORM model instance representing the database table.
+     * 
+     * **IMPORTANT**: The model must be defined by spreading `...BaseColumns`.
+     * @example
+     * ```typescript
+        import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
+        import { BaseColumns } from "../../common/schemas/base-model.schema";
+        export const itemTable = mysqlTable("item_tab", {
+        column1: varchar("column_1", { length: 255 }).notNull(),
+            ...BaseColumns
+        });
+    * ```
+     */
     model: MySqlTableWithColumns<T>;
+    /** A whitelist of column names permitted for dynamic filtering. */
     filterKeys: string[];
+    /** A whitelist of column names permitted for dynamic sorting. */
     sortKeys: string[];
+    /** A whitelist of column names permitted for global search functionality. */
     searchKeys: string[];
+    /** Swagger/OpenAPI tags for API documentation grouping. */
     tags: string[];
+    /** * TypeBox/Elysia schemas for request validation.
+     * Includes the request body and the expected success response structure.
+     */
     schemas: {
         body: TSchema;
         response: TSchema;
     };
+    /** * Role-Based Access Control (RBAC) settings.
+     * Defines which user roles are permitted to perform specific CRUD actions.
+     */
     roles: {
         getAllDataRoles: string[],
         getDataRoles: string[],
