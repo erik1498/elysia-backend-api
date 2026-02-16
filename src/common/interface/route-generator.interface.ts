@@ -1,6 +1,6 @@
 import { AnyMySqlColumn, MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
 import { TSchema } from "elysia";
-import { BaseColumns } from "../schemas/base-model.schema";
+import { BaseColumns } from "../models/base.model";
 
 type BaseKeys = keyof typeof BaseColumns;
 
@@ -8,25 +8,40 @@ export interface TableWithBase extends TableConfig {
     columns: Record<BaseKeys, AnyMySqlColumn> & TableConfig["columns"];
 }
 
+/**
+ * Creates a new record in the table and records the activity to the audit log.
+ * * @template T - Table configuration type that must implement {@link BaseColumns}.
+ * @param data - The data object to be inserted, matching the table schema.
+ * @param meta - Request metadata for audit trail (User UUID, IP Address, Request ID, etc.).
+ * @param model - Drizzle ORM MySQL table instance.
+ * * **IMPORTANT**: The model must be defined by spreading `...BaseColumns`.
+ * @example
+ * ```typescript
+    import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
+    import { BaseColumns } from "../../common/schemas/base-model.schema";
+    export const itemTable = mysqlTable("item_tab", {
+    column1: varchar("column_1", { length: 255 }).notNull(),
+        ...BaseColumns
+    });
+ * ```
+ * * @param entityName - The name of the entity (e.g., "Item") for log entries.
+ * @returns Returns the database execution result of the insert operation.
+ * @throws Throws an error if a duplicate entry is found or connection fails.
+ * * @example
+ * ```typescript
+ * await createRepository(body, meta, itemTable, "Item");
+ * ```
+ */
+
 export interface RouteConfig<T extends TableWithBase> {
-    /** Nama unik konfigurasi (Internal) */
     name: string;
-    /** Nama entitas yang akan muncul di Swagger Tags dan Log */
     entityName: string;
-    /** * Base path untuk API. 
-     * @example "/v1/inventory/barang"
-     */
     prefix: string;
-    /** Instance tabel dari Drizzle ORM */
     model: MySqlTableWithColumns<T>;
     filterKeys: string[];
-    /** * Array kolom yang diizinkan untuk fitur pencarian global.
-     * Hanya menerima kolom yang terdefinisi di dalam tabel {@link T}.
-     */
     sortKeys: string[];
     searchKeys: string[];
     tags: string[];
-    /** Definisi skema validasi (Elysia TSchema) untuk body dan response */
     schemas: {
         body: TSchema;
         response: TSchema;

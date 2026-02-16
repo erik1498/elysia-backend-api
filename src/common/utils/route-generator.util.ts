@@ -16,7 +16,7 @@ import { auditLogTable } from "../../apps/audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
-import { BaseColumnsType } from "../schemas/base-model.schema";
+import { BaseColumnsType } from "../models/base.model";
 
 const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(paginationObject: {
@@ -105,7 +105,7 @@ const modelRepository = {
             ).limit(1)
         return data
     },
-    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid
@@ -313,18 +313,16 @@ const modelService = {
 
 
 /**
- * Menambahkan data baru ke tabel sekaligus mencatat aktivitas ke audit log.
- * * @template T - Tipe konfigurasi tabel yang harus memiliki {@link BaseColumns}.
- * @param data - Objek data yang akan di-insert, sesuai dengan skema tabel.
- * @param meta - Metadata dari request (User UUID, IP Address, dll).
- * @param model - Instance tabel Drizzle (MySQL).
- * @param entityName - Nama entitas (misal: "Sumber Dana") untuk catatan log.
- * * @returns Mengembalikan hasil eksekusi insert dari database.
- * @throws Akan melempar error jika terjadi duplikasi data atau kegagalan koneksi.
- * * @example
- * ```typescript
- * await createRepository(body, meta, sumberDanaTable, "Sumber Dana");
- * ```
+ * Automatically generates a standard CRUD route group for a given entity.
+ * Includes built-in support for:
+ * - Idempotency, JWT, and Rate Limiting.
+ * - Role-based Access Control (RBAC).
+ * - Automatic Logging and Audit Trail.
+ * - Standardized API Responses.
+ * * @template T - Table configuration that extends {@link TableWithBase}.
+ * @param group - The Elysia group instance to attach routes to.
+ * @param config - Configuration object of type {@link RouteConfig}.
+ * @returns An Elysia group with GET, POST, PUT, and DELETE endpoints.
  */
 
 export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
@@ -333,6 +331,9 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
         .use(jwtMiddleware)
         .use(paginationPlugin)
         .use(rateLimiter(config.prefix, 60, 60))
+        /**
+         * [GET] Fetch all records with pagination, filtering, and sorting.
+         */
         .get("/", async ({ query, meta }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
 
@@ -358,6 +359,9 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: PaginatedResponseSchema(config.schemas.response)
             }
         })
+        /**
+         * [GET] Fetch a single record by its UUID.
+         */
         .get("/:uuid", async ({ params, meta }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
             const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name);
@@ -378,6 +382,9 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
+        /**
+         * [POST] Create a new record. Supports Idempotency check.
+         */
         .post("/", async ({ request: { headers }, body, meta, set }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.createHandler hit`)
             const created = await modelService.createService(body, meta, config.model, config.name, config.entityName)
@@ -405,6 +412,9 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 201: BaseResponseSchema(config.schemas.response)
             }
         })
+        /**
+         * [PUT] Update an existing record by UUID.
+         */
         .put("/:uuid", async ({ params, body, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.updateHandler hit`)
             const updated = await modelService.updateService(params.uuid, body, meta, config.model, config.name, config.entityName)
@@ -428,6 +438,9 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
+        /**
+         * [DELETE] Soft-delete a record by setting enabled to false.
+         */
         .delete("/:uuid", async ({ params, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.deleteHandler hit`)
             await modelService.deleteService(params.uuid, meta, config.model, config.name, config.entityName)
