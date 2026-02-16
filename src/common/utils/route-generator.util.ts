@@ -16,7 +16,7 @@ import { auditLogTable } from "../../apps/audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
-import { BaseColumnsType } from "../schemas/base-model.schema";
+import { BaseColumnsType } from "../models/base.model";
 
 const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(paginationObject: {
@@ -105,7 +105,7 @@ const modelRepository = {
             ).limit(1)
         return data
     },
-    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid

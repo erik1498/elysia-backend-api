@@ -1,6 +1,6 @@
 import { AnyMySqlColumn, MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
 import { TSchema } from "elysia";
-import { BaseColumns } from "../schemas/base-model.schema";
+import { BaseColumns } from "../models/base.model";
 
 type BaseKeys = keyof typeof BaseColumns;
 
