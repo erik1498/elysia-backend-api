@@ -1,9 +1,9 @@
 import Elysia, { t } from "elysia";
-import { BaseResponseSchema } from "../../../common/schemas/response.schema";
+import { BaseResponseSchema } from "../../schemas/response.schema";
 import { UserInfoResponseSchema, UserLoginBodySchema, UserLoginResponseSchema, UserRegisterBodySchema } from "./user.schema";
-import { jwtMiddleware } from "../../../common/middlewares/jwt.middleware";
+import { jwtMiddleware } from "../../middlewares/jwt.middleware";
 import { userHandler } from "./user.handler";
-import { rateLimiter } from "../../../common/middlewares/rate-limit.middleware";
+import { rateLimiter } from "../../middlewares/rate-limit.middleware";
 
 export const userRoute = (app: Elysia) => {
     return app
