@@ -38,9 +38,10 @@ export interface RouteConfig<T extends TableWithBase> {
      * @example
      * ```typescript
         import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
-        import { BaseColumns } from "../../common/schemas/base-model.schema";
+        import { BaseColumns } from "../../common/models/base.model";
+        
         export const itemTable = mysqlTable("item_tab", {
-        column1: varchar("column_1", { length: 255 }).notNull(),
+            column1: varchar("column_1", { length: 255 }).notNull(),
             ...BaseColumns
         });
     * ```
@@ -58,7 +59,32 @@ export interface RouteConfig<T extends TableWithBase> {
      * Includes the request body and the expected success response structure.
      */
     schemas: {
+        /**
+         * @example
+         * ```typescript
+            import { t } from "elysia";
+            
+            export const ItemBodySchema = t.Object({
+                column: t.String({
+                    maxLength: 255,
+                    minLength: 1,
+                    examples: ["Item"]
+                }),
+            })
+        * ```
+        */
         body: TSchema;
+        /**
+         * @example
+         * ```typescript
+            import { t } from "elysia";
+
+            export const ItemResponseSchema = t.Object({
+                uuid: t.String({ format: 'uuid' }),
+                nama: t.String(),
+            });
+        * ```
+        */
         response: TSchema;
     };
     /** * Role-Based Access Control (RBAC) settings.

@@ -311,7 +311,6 @@ const modelService = {
     }
 }
 
-
 /**
  * Automatically generates a standard CRUD route group for a given entity.
  * Includes built-in support for:
