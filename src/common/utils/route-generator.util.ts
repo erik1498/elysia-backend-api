@@ -1,5 +1,5 @@
 import Elysia, { Static, t } from "elysia";
-import { RouteConfig } from "../interface/route-generator.interface";
+import { RouteConfig, TableWithBase } from "../interface/route-generator.interface";
 import { idempotencyMiddleware } from "../middlewares/idempotency.middleware";
 import { jwtMiddleware } from "../middlewares/jwt.middleware";
 import { paginationPlugin } from "../plugins/pagination.plugin";
@@ -10,27 +10,28 @@ import { and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
-import { MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
+import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
 import { cache } from "../config/storage/redis.config";
 import { auditLogTable } from "../../apps/audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
+import { BaseColumnsType } from "../schemas/base-model.schema";
 
 const modelRepository = {
-    getAllRepository: async <T extends TableConfig>(paginationObject: {
+    getAllRepository: async <T extends TableWithBase>(paginationObject: {
         page: number,
         size: number,
         search?: string,
         filter?: Record<string, string>,
-        sort?: Record<string, string>
-    }, model: MySqlTableWithColumns<T>) => {
+        sort?: Record<string, string>,
+    }, model: MySqlTableWithColumns<T>,
+        searchAllowedColumn: string[]
+    ) => {
 
         let filterConditions: SQL[] = [];
         let searchConditions: SQL[] = [];
         let orderSelectors: SQL[] = [];
-
-        const searchAllowedColumn = ["nama"] as const;
 
         type ModelTable = typeof model.$inferSelect;
         type ModelColumnName = keyof ModelTable;
@@ -92,7 +93,7 @@ const modelRepository = {
             dataCount
         }
     },
-    getByUuidRepository: async <T extends TableConfig>(uuid: string, model: MySqlTableWithColumns<T>) => {
+    getByUuidRepository: async <T extends TableWithBase>(uuid: string, model: MySqlTableWithColumns<T>) => {
         const [data] = await db
             .select()
             .from(model)
@@ -104,7 +105,7 @@ const modelRepository = {
             ).limit(1)
         return data
     },
-    createRepository: async <T extends TableConfig>(data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid
@@ -148,7 +149,7 @@ const modelRepository = {
 
         return created
     },
-    updateRepository: async <T extends TableConfig>(uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    updateRepository: async <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
         const updatedResult = await db.transaction(async (tx) => {
 
             const [oldData] = await tx
@@ -193,12 +194,12 @@ const modelRepository = {
 
         return updatedResult
     },
-    deleteRepository: async <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    deleteRepository: async <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
 
         const data = {
             enabled: false,
             updatedBy: meta.userUuid
-        } as any
+        } as MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType
 
         const deletedResult = await db.transaction(async (tx) => {
 
@@ -247,12 +248,12 @@ const modelRepository = {
 }
 
 const modelService = {
-    getAllService: async <T extends TableConfig>(query: Static<typeof PaginationQueryRequestSchema>, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, filterKeys: string[], sortKeys: string[]) => {
+    getAllService: async <T extends TableWithBase>(query: Static<typeof PaginationQueryRequestSchema>, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, filterKeys: string[], sortKeys: string[], searchKeys: string[]) => {
         meta.log.info(query, `SERVICE: ${name}Service.getAllService called`)
 
         const paginationObject = PaginationUtil.convertQueryToObject(query)
 
-        const data = await modelRepository.getAllRepository(paginationObject, model)
+        const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys)
 
         const totalPages = Math.ceil(data.dataCount[0].total / paginationObject.size)
 
@@ -270,7 +271,7 @@ const modelService = {
             }
         }
     },
-    getByUuidService: async  <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string) => {
+    getByUuidService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.getBarangByUuidService called`)
         const data = await modelRepository.getByUuidRepository(uuid, model)
 
@@ -280,7 +281,7 @@ const modelService = {
 
         return data
     },
-    createService: async  <T extends TableConfig>(data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    createService: async  <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info(data, `SERVICE: ${name}Service.createBarangService called`)
         const created = await modelRepository.createRepository(data, meta, model, entityName)
 
@@ -290,7 +291,7 @@ const modelService = {
 
         return created
     },
-    updateService: async  <T extends TableConfig>(uuid: string, data: any, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    updateService: async  <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info({ uuid, data }, `SERVICE: ${name}Service.updateService called`)
         const updated = await modelRepository.updateRepository(uuid, data, meta, model, entityName)
 
@@ -300,7 +301,7 @@ const modelService = {
 
         return await modelRepository.getByUuidRepository(uuid, model)
     },
-    deleteService: async  <T extends TableConfig>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    deleteService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.deleteBarangService called`)
         const deleted = await modelRepository.deleteRepository(uuid, meta, model, entityName)
 
@@ -311,7 +312,22 @@ const modelService = {
 }
 
 
-export const createGenericRoute = <T extends TableConfig>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
+/**
+ * Menambahkan data baru ke tabel sekaligus mencatat aktivitas ke audit log.
+ * * @template T - Tipe konfigurasi tabel yang harus memiliki {@link BaseColumns}.
+ * @param data - Objek data yang akan di-insert, sesuai dengan skema tabel.
+ * @param meta - Metadata dari request (User UUID, IP Address, dll).
+ * @param model - Instance tabel Drizzle (MySQL).
+ * @param entityName - Nama entitas (misal: "Sumber Dana") untuk catatan log.
+ * * @returns Mengembalikan hasil eksekusi insert dari database.
+ * @throws Akan melempar error jika terjadi duplikasi data atau kegagalan koneksi.
+ * * @example
+ * ```typescript
+ * await createRepository(body, meta, sumberDanaTable, "Sumber Dana");
+ * ```
+ */
+
+export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
     return group
         .use(idempotencyMiddleware)
         .use(jwtMiddleware)
@@ -320,7 +336,7 @@ export const createGenericRoute = <T extends TableConfig>(group: Elysia<any, any
         .get("/", async ({ query, meta }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
 
-            const data = await modelService.getAllService(query, meta, config.model, config.name, config.filterKeys, config.sortKeys)
+            const data = await modelService.getAllService(query, meta, config.model, config.name, config.filterKeys, config.sortKeys, config.searchKeys)
 
             return ApiResponseUtil.success({
                 message: "Get All Data Success",
