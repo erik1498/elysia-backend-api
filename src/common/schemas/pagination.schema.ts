@@ -10,30 +10,28 @@ export const PaginationQueryRequestSchema = t.Object({
         default: 5
     }),
     search: t.Optional(t.String()),
-    filter: t.Optional(t.String({ 
+    filter: t.Optional(t.String({
         pattern: "^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(;[a-zA-Z0-9_]+:[a-zA-Z0-9_]+)*$",
-        examples: ["nama:nike;status:tersedia"],
         error: "The filter format is invalid. Use 'field:value' or 'field:value;field:value' for multiple filters."
     })),
-    sort: t.Optional(t.String({ 
+    sort: t.Optional(t.String({
         pattern: "^[a-zA-Z0-9_]+:(asc|desc|ASC|DESC)(;[a-zA-Z0-9_]+:(asc|desc|ASC|DESC))*$",
-        examples: ["harga:desc;nama:asc"],
         error: "The sort format is invalid. Use 'field:direction' (asc/desc), e.g., 'price:desc' or 'price:desc;name:asc' for multiple sorting."
     }))
 })
 
-export const MetaSchema = t.Object({
-    page: t.Number(),
-    limit: t.Number(),
-    total_items: t.Number(),
-    total_pages: t.Number(),
-    has_next: t.Boolean(),
-    has_prev: t.Boolean(),
-});
-
 export const PaginatedResponseSchema = (dataSchema: any) => t.Object({
     success: t.Boolean({ default: true }),
     message: t.String(),
-    data: t.Array(dataSchema),
-    meta: MetaSchema
+    data: t.Optional(t.Array(dataSchema)),
+    meta: t.Optional(t.Object({
+        page: t.Number(),
+        size: t.Number(),
+        totalItems: t.Number(),
+        totalPages: t.Number(),
+        hasNext: t.Boolean(),
+        hasPrev: t.Boolean(),
+        filterAllowedKeys: t.Array(t.String()),
+        sortAllowedKeys: t.Array(t.String()),
+    }))
 });

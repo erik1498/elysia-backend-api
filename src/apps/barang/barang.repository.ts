@@ -1,6 +1,6 @@
 import { barangTable } from "./barang.model";
 import { db } from "../../common/config/database/database.config";
-import { and, asc, desc, eq, InferInsertModel, like, or, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, InferInsertModel, like, or, sql, SQL } from "drizzle-orm";
 import { RequestMeta } from "../../common/interface/context";
 import { auditLogTable } from "../audit/audit.model";
 
@@ -57,7 +57,21 @@ export const barangRepository = {
             .limit(paginationObject.size)
             .offset((paginationObject.page - 1) * paginationObject.size)
 
-        return data
+        const dataCount = await db
+            .select({ total: sql<number>`count(*)` })
+            .from(barangTable)
+            .where(
+                and(
+                    or(...searchConditions)!,
+                    ...filterConditions,
+                    eq(barangTable.enabled, true)
+                )
+            )
+
+        return {
+            data,
+            dataCount
+        }
     },
     getBarangByUuidRepository: async (uuid: string) => {
         const [data] = await db

@@ -1,7 +1,9 @@
+import { Static } from "elysia";
 import { ValidationError } from "../errors/app.error";
+import { PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 
 export const PaginationUtil = {
-    queryToObject: (input: string) => {
+    queryToObject: (input?: string) => {
         if (!input) return {};
         const result: Record<string, string> = {};
 
@@ -13,13 +15,6 @@ export const PaginationUtil = {
         return result;
     },
     keyOnQueryCheck: (params: { type: string, allowedKeys: string[], query: string }) => {
-        if (params.allowedKeys.length === 0) {
-            throw new ValidationError([{
-                field: params.type,
-                message: `${params.type} is currently disabled for this resource.`
-            }])
-        }
-
         const queryObject = PaginationUtil.queryToObject(params.query)
 
         Object.keys(queryObject).forEach((key) => {
@@ -31,10 +26,14 @@ export const PaginationUtil = {
             }
         })
     },
-    convertQueryToObject: (query: any) => {
-        query.filter = PaginationUtil.queryToObject(query.filter)
-        query.sort = PaginationUtil.queryToObject(query.sort)
+    convertQueryToObject: (query: Static<typeof PaginationQueryRequestSchema>) => {
+        const filter = PaginationUtil.queryToObject(query.filter)
+        const sort = PaginationUtil.queryToObject(query.sort)
 
-        return query
+        return {
+            ...query,
+            filter,
+            sort
+        }
     }
 }
