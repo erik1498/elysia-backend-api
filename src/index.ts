@@ -17,9 +17,8 @@ const app = new
         path: '/docs',
         documentation: {
             info: {
-                title: 'Backend API Barang Documentation',
+                title: 'Backend API Documentation',
                 version: '1.0.0',
-                description: 'Dokumentasi lengkap untuk manajemen data barang'
             },
             components: {
                 securitySchemes: {
