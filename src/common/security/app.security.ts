@@ -19,17 +19,17 @@ export const securityPlugin = (app: Elysia) =>
             allowedHeaders: ['Content-Type', 'Authorization'],
             credentials: true,
         }))
-        // .use(helmet({
-        //     contentSecurityPolicy: {
-        //         directives: {
-        //             defaultSrc: ["'self'"],
-        //             scriptSrc: ["'self'", "'unsafe-inline'"],
-        //             objectSrc: ["'none'"],
-        //             upgradeInsecureRequests: [],
-        //         },
-        //     },
-        //     hidePoweredBy: true,
-        // }))
+        .use(helmet({
+            contentSecurityPolicy: {
+                directives: {
+                    defaultSrc: ["'self'"],
+                    scriptSrc: ["'self'", "'unsafe-inline'"],
+                    objectSrc: ["'none'"],
+                    upgradeInsecureRequests: [],
+                },
+            },
+            hidePoweredBy: true,
+        }))
         .use(sanitizerMiddleware)
 
 export const elysiaSecuritySetting = {
