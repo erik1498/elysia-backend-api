@@ -10,13 +10,20 @@ import { and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
-import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
+import { MySqlColumnBuilderBase, mysqlTable, MySqlTableWithColumns } from "drizzle-orm/mysql-core";
 import { cache } from "../config/storage/redis.config";
 import { auditLogTable } from "../audit/audit.model";
 import { BadRequestError, NotFoundError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
-import { BaseColumnsType } from "../models/base.model";
+import { BaseColumns, BaseColumnsType } from "../models/base.model";
+
+export const createGenericModel = (tableName: string, tableColumn: Record<string, MySqlColumnBuilderBase>) => {
+    return mysqlTable(tableName, {
+        ...tableColumn,
+        ...BaseColumns
+    })
+}
 
 const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(paginationObject: {

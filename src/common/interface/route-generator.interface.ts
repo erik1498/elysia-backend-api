@@ -34,15 +34,14 @@ export interface RouteConfig<T extends TableWithBase> {
      * 
      * The Drizzle ORM model instance representing the database table.
      * 
-     * **IMPORTANT**: The model must be defined by spreading `...BaseColumns`.
+     * **IMPORTANT**: The model must be defined with `createGenericModel` function.
      * @example
      * ```typescript
-        import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
-        import { BaseColumns } from "../../common/models/base.model";
+        import { varchar } from "drizzle-orm/mysql-core";
+        import { createGenericModel } from "../../common/utils/route-generator.util";
         
-        export const itemTable = mysqlTable("item_tab", {
+        export const itemTable = createGenericModel("item_tab", {
             column1: varchar("column_1", { length: 255 }).notNull(),
-            ...BaseColumns
         });
     * ```
      */

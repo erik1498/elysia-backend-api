@@ -1,7 +1,6 @@
-import { mysqlTable, varchar } from "drizzle-orm/mysql-core";
-import { BaseColumns } from "../../common/models/base.model";
+import { varchar } from "drizzle-orm/mysql-core";
+import { createGenericModel } from "../../common/utils/route-generator.util";
 
-export const sumberDanaTable = mysqlTable("sumber_dana_tab", {
+export const sumberDanaTable = createGenericModel("sumber_dana", {
     nama: varchar("nama", { length: 255 }).notNull(),
-    ...BaseColumns
 });
