@@ -111,3 +111,14 @@ export class ValidationError extends AppError {
         this.name = 'ValidationError';
     }
 }
+
+/**
+ * Thrown when a requested error on database.
+ * HTTP Status: 400 Bad Request
+ */
+export class SQLError extends AppError {
+    /** @param message - Custom error message (Defaults to "Bad Request") */
+    constructor(message = "Bad Request") {
+        super(400, message, "SQLError");
+    }
+}
