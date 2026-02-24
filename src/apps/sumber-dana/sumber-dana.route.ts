@@ -11,7 +11,6 @@ export const sumberDanaRoute = (app: Elysia) => {
                 filterKeys: ["nama"],
                 model: sumberDanaTable,
                 name: "sumberDana",
-                prefix: "sumber-dana",
                 roles: {
                     deleteDataRoles: ["super_admin"],
                     getAllDataRoles: ["super_admin"],
