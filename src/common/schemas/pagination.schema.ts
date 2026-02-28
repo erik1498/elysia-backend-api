@@ -28,7 +28,7 @@ export const PaginationQueryRequestSchema = t.Object({
      * @example "category:electronics;status:active"
      */
     filter: t.Optional(t.String({
-        pattern: "^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(;[a-zA-Z0-9_]+:[a-zA-Z0-9_]+)*$",
+        pattern: "^[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+(;[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+)*$",
         error: "The filter format is invalid. Use 'field:value' or 'field:value;field:value' for multiple filters."
     })),
 
