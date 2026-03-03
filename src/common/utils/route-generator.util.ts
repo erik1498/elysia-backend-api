@@ -6,7 +6,7 @@ import { paginationPlugin } from "../plugins/pagination.plugin";
 import { rateLimiter } from "../middlewares/rate-limit.middleware";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
-import { and, asc, desc, eq, inArray, like, or, SQL, sql } from "drizzle-orm";
+import { aliasedTable, and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
@@ -43,6 +43,12 @@ export const createGenericModel = <
         return [];
     });
 }
+
+const getEffectiveTable = (rel: RelationConfig) => {
+    return rel.aliasedName
+        ? aliasedTable(rel.relationTable, rel.aliasedName)
+        : rel.relationTable;
+};
 
 const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(
@@ -101,8 +107,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
                 });
             });
         }
@@ -111,9 +118,10 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
-                    rel.relationTable,
-                    eq(model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
@@ -134,9 +142,10 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
                 countQuery.leftJoin(
-                    rel.relationTable,
-                    eq(model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
@@ -163,8 +172,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
                 });
             });
         }
@@ -175,9 +185,10 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
-                    rel.relationTable,
-                    eq(model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
