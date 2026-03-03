@@ -51,13 +51,15 @@ const getEffectiveTable = (rel: RelationConfig) => {
 };
 
 const modelRepository = {
-    getAllRepository: async <T extends TableWithBase>(paginationObject: {
-        page: number,
-        size: number,
-        search?: string,
-        filter?: Record<string, string>,
-        sort?: Record<string, string>,
-    }, model: MySqlTableWithColumns<T>,
+    getAllRepository: async <T extends TableWithBase>(
+        paginationObject: {
+            page: number,
+            size: number,
+            search?: string,
+            filter?: Record<string, string | string[]>,
+            sort?: Record<string, string | string[]>,
+        },
+        model: MySqlTableWithColumns<T>,
         searchAllowedColumn: string[],
         relationConfigs?: RelationConfig[]
     ) => {
@@ -80,18 +82,23 @@ const modelRepository = {
             Object.entries(paginationObject.filter).forEach(([key, value]) => {
                 if (key in model && value !== undefined && value !== null) {
                     const column = model[key as ModelColumnName];
-                    filterConditions.push(eq(column as any, value));
+
+                    if (Array.isArray(value)) {
+                        filterConditions.push(inArray(column as any, value));
+                    } else {
+                        filterConditions.push(eq(column as any, value));
+                    }
                 }
-            })
+            });
         }
 
         if (paginationObject.sort) {
             Object.entries(paginationObject.sort).forEach(([key, direction]) => {
                 const column = model[key as ModelColumnName];
                 if (column) {
-                    orderSelectors.push(
-                        direction === 'desc' ? desc(column) : asc(column)
-                    );
+                    const dir = Array.isArray(direction) ? direction[0] : direction;
+                    const isDesc = dir?.toLowerCase() === 'desc';
+                    orderSelectors.push(isDesc ? desc(column) : asc(column));
                 }
             });
         }
@@ -107,9 +114,7 @@ const modelRepository = {
             });
         }
 
-        const baseQuery = db
-            .select(querySelect)
-            .from(model);
+        const baseQuery = db.select(querySelect).from(model);
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
@@ -156,8 +161,8 @@ const modelRepository = {
 
         return {
             data,
-            dataCount
-        }
+            totalItems: Number(dataCount[0]?.total || 0)
+        };
     },
     getByUuidRepository: async <T extends TableWithBase>(uuid: string, model: MySqlTableWithColumns<T>, relationConfigs?: RelationConfig[]) => {
         type ModelTable = typeof model.$inferSelect;
@@ -349,14 +354,14 @@ const modelService = {
 
         const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys, relationConfigs)
 
-        const totalPages = Math.ceil(data.dataCount[0].total / paginationObject.size)
+        const totalPages = Math.ceil(data.totalItems / paginationObject.size)
 
         return {
             data: data.data,
             meta: {
                 page: paginationObject.page,
                 size: paginationObject.size,
-                totalItems: data.dataCount[0].total,
+                totalItems: data.totalItems,
                 totalPages,
                 hasNext: paginationObject.page < totalPages,
                 hasPrev: paginationObject.page > 1,
