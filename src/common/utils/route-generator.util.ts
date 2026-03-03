@@ -6,7 +6,7 @@ import { paginationPlugin } from "../plugins/pagination.plugin";
 import { rateLimiter } from "../middlewares/rate-limit.middleware";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
-import { aliasedTable, and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
+import { aliasedTable, and, asc, desc, eq, inArray, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
