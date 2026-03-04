@@ -1,9 +1,6 @@
 import Elysia, { Static, t } from "elysia";
 import { RelationConfig, RouteConfig, TableWithBase } from "../interface/route-generator.interface";
-import { idempotencyMiddleware } from "../middlewares/idempotency.middleware";
-import { jwtMiddleware } from "../middlewares/jwt.middleware";
 import { paginationPlugin } from "../plugins/pagination.plugin";
-import { rateLimiter } from "../middlewares/rate-limit.middleware";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
 import { aliasedTable, and, asc, desc, eq, inArray, like, or, SQL, sql } from "drizzle-orm";
@@ -11,7 +8,6 @@ import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
 import { MySqlColumnBuilderBase, mysqlTable, MySqlTableExtraConfigValue, MySqlTableWithColumns } from "drizzle-orm/mysql-core";
-import { cache } from "../config/storage/redis.config";
 import { auditLogTable } from "../audit/audit.model";
 import { BadRequestError, NotFoundError, SQLError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
@@ -424,11 +420,19 @@ const modelService = {
  */
 
 export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
+
+    if (typeof Bun !== "undefined") {
+        const { idempotencyMiddleware } = require("../middlewares/idempotency.middleware");
+        const { jwtMiddleware } = require("../middlewares/jwt.middleware");
+        const { rateLimiter } = require("../middlewares/rate-limit.middleware");
+
+        group.use(idempotencyMiddleware);
+        group.use(jwtMiddleware);
+        group.use(rateLimiter(config.name, 60, 60));
+    }
+
     return group
-        .use(idempotencyMiddleware)
-        .use(jwtMiddleware)
         .use(paginationPlugin)
-        .use(rateLimiter(config.name, 60, 60))
         /**
          * [GET] Fetch all records with pagination, filtering, and sorting.
          */
@@ -501,9 +505,13 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 data: created
             })
 
-            const idmpKey = headers.get("x-idempotency-key")
-
-            await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800)
+            if (typeof Bun !== "undefined") {
+                const { cache } = require("../config/storage/redis.config");
+                const idmpKey = headers.get("x-idempotency-key");
+                if (idmpKey) {
+                    await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800);
+                }
+            }
 
             return response
         }, {
