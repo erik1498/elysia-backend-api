@@ -1,6 +1,6 @@
-import { cache } from "../../../common/config/storage/redis.config"
-import { AppUtil } from "../../../common/utils/app.util"
-import { ApiResponseUtil } from "../../../common/utils/response.util"
+import { cache } from "../../config/storage/redis.config"
+import { AppUtil } from "../../utils/app.util"
+import { ApiResponseUtil } from "../../utils/response.util"
 import { userService } from "./user.service"
 
 export const userHandler = {

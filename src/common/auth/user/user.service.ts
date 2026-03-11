@@ -1,4 +1,4 @@
-import { BadRequestError, UnauthorizedError } from "../../../common/errors/app.error"
+import { BadRequestError, UnauthorizedError } from "../../errors/app.error"
 import { tokenRepository } from "../token/token.repository"
 import { userRoleRepository } from "../user-role/user-role.repository"
 import { userRepository } from "./user.repository"

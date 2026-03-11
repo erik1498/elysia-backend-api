@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { roleTable } from "../role/role.model";
 import { userRoleTable } from "./user-role.model";
-import { db } from "../../../common/config/database/database.config";
+import { db } from "../../config/database/database.config";
 
 export const userRoleRepository = {
     getRoleListByUserUUIDRepository: async (userUuid: string) => {

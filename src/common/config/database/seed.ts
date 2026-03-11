@@ -1,7 +1,7 @@
 import { db } from "./database.config";
-import { userTable } from "../../../apps/auth/user/user.model";
-import { roleTable } from "../../../apps/auth/role/role.model";
-import { userRoleTable } from "../../../apps/auth/user-role/user-role.model";
+import { userTable } from "../../auth/user/user.model";
+import { roleTable } from "../../auth/role/role.model";
+import { userRoleTable } from "../../auth/user-role/user-role.model";
 import { appLogger } from "../logging/logging.config";
 
 /**

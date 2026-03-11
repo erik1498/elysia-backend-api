@@ -1,32 +1,63 @@
 import Elysia, { Static, t } from "elysia";
-import { RouteConfig, TableWithBase } from "../interface/route-generator.interface";
-import { idempotencyMiddleware } from "../middlewares/idempotency.middleware";
-import { jwtMiddleware } from "../middlewares/jwt.middleware";
+import { RelationConfig, RouteConfig, TableWithBase } from "../interface/route-generator.interface";
 import { paginationPlugin } from "../plugins/pagination.plugin";
-import { rateLimiter } from "../middlewares/rate-limit.middleware";
-import { RequestMeta } from "../../common/interface/context";
-import { PaginationUtil } from "../../common/utils/pagination.util";
-import { and, asc, desc, eq, like, or, SQL, sql } from "drizzle-orm";
+import { RequestMeta } from "../interface/context";
+import { PaginationUtil } from "./pagination.util";
+import { aliasedTable, and, asc, desc, eq, inArray, like, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
-import { MySqlTableWithColumns } from "drizzle-orm/mysql-core";
-import { cache } from "../config/storage/redis.config";
-import { auditLogTable } from "../../apps/audit/audit.model";
-import { BadRequestError, NotFoundError } from "../errors/app.error";
+import { MySqlColumnBuilderBase, mysqlTable, MySqlTableExtraConfigValue, MySqlTableWithColumns } from "drizzle-orm/mysql-core";
+import { auditLogTable } from "../audit/audit.model";
+import { BadRequestError, NotFoundError, SQLError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
-import { BaseColumnsType } from "../models/base.model";
+import { BaseColumns, BaseColumnsType } from "../models/base.model";
+
+export const createGenericModel = <
+    TTableName extends string,
+    TColumns extends Record<string, MySqlColumnBuilderBase>
+>(
+    tableName: TTableName,
+    tableColumn: TColumns,
+    relations?: (self: any) => MySqlTableExtraConfigValue[]
+) => {
+    const dynamicBaseColumns = {
+        ...BaseColumns,
+        idempotencyKey: BaseColumns.idempotencyKey.unique(`${tableName}_idmp`)
+    };
+
+    const allColumn = {
+        ...tableColumn,
+        ...dynamicBaseColumns
+    };
+
+    return mysqlTable(tableName, allColumn, (table) => {
+        if (relations) {
+            return relations(table);
+        }
+        return [];
+    });
+}
+
+const getEffectiveTable = (rel: RelationConfig) => {
+    return rel.aliasedName
+        ? aliasedTable(rel.relationTable, rel.aliasedName)
+        : rel.relationTable;
+};
 
 const modelRepository = {
-    getAllRepository: async <T extends TableWithBase>(paginationObject: {
-        page: number,
-        size: number,
-        search?: string,
-        filter?: Record<string, string>,
-        sort?: Record<string, string>,
-    }, model: MySqlTableWithColumns<T>,
-        searchAllowedColumn: string[]
+    getAllRepository: async <T extends TableWithBase>(
+        paginationObject: {
+            page: number,
+            size: number,
+            search?: string,
+            filter?: Record<string, string | string[]>,
+            sort?: Record<string, string | string[]>,
+        },
+        model: MySqlTableWithColumns<T>,
+        searchAllowedColumn: string[],
+        relationConfigs?: RelationConfig[]
     ) => {
 
         let filterConditions: SQL[] = [];
@@ -47,62 +78,125 @@ const modelRepository = {
             Object.entries(paginationObject.filter).forEach(([key, value]) => {
                 if (key in model && value !== undefined && value !== null) {
                     const column = model[key as ModelColumnName];
-                    filterConditions.push(eq(column as any, value));
+
+                    if (Array.isArray(value)) {
+                        filterConditions.push(inArray(column as any, value));
+                    } else {
+                        filterConditions.push(eq(column as any, value));
+                    }
                 }
-            })
+            });
         }
 
         if (paginationObject.sort) {
             Object.entries(paginationObject.sort).forEach(([key, direction]) => {
                 const column = model[key as ModelColumnName];
                 if (column) {
-                    orderSelectors.push(
-                        direction === 'desc' ? desc(column) : asc(column)
-                    );
+                    const dir = Array.isArray(direction) ? direction[0] : direction;
+                    const isDesc = dir?.toLowerCase() === 'desc';
+                    orderSelectors.push(isDesc ? desc(column) : asc(column));
                 }
             });
         }
 
-        const data = await db
-            .select()
-            .from(model)
+        let querySelect: any = { ...model };
+
+        if (relationConfigs) {
+            relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
+                rel.relationData.forEach((data) => {
+                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
+                });
+            });
+        }
+
+        const baseQuery = db.select(querySelect).from(model);
+
+        if (relationConfigs) {
+            relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
+                baseQuery.leftJoin(
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                );
+            });
+        }
+
+        const data = await baseQuery
             .where(
                 and(
-                    or(...searchConditions)!,
+                    searchConditions.length > 0 ? or(...searchConditions) : undefined,
                     ...filterConditions,
                     eq(model.enabled, true)
                 )
             )
             .orderBy(...orderSelectors)
             .limit(paginationObject.size)
-            .offset((paginationObject.page - 1) * paginationObject.size)
+            .offset((paginationObject.page - 1) * paginationObject.size);
 
-        const dataCount = await db
-            .select({ total: sql<number>`count(*)` })
-            .from(model)
+        const countQuery = db.select({ total: sql<number>`count(*)` }).from(model);
+
+        if (relationConfigs) {
+            relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
+                countQuery.leftJoin(
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                );
+            });
+        }
+
+        const dataCount = await countQuery
             .where(
                 and(
-                    or(...searchConditions)!,
+                    searchConditions.length > 0 ? or(...searchConditions) : undefined,
                     ...filterConditions,
                     eq(model.enabled, true)
                 )
-            )
+            );
 
         return {
             data,
-            dataCount
-        }
+            totalItems: Number(dataCount[0]?.total || 0)
+        };
     },
-    getByUuidRepository: async <T extends TableWithBase>(uuid: string, model: MySqlTableWithColumns<T>) => {
-        const [data] = await db
-            .select()
-            .from(model)
+    getByUuidRepository: async <T extends TableWithBase>(uuid: string, model: MySqlTableWithColumns<T>, relationConfigs?: RelationConfig[]) => {
+        type ModelTable = typeof model.$inferSelect;
+        type ModelColumnName = keyof ModelTable;
+
+        let querySelect: any = { ...model };
+
+        if (relationConfigs) {
+            relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
+                rel.relationData.forEach((data) => {
+                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
+                });
+            });
+        }
+
+        const baseQuery = db
+            .select(querySelect)
+            .from(model);
+
+        if (relationConfigs) {
+            relationConfigs.forEach((rel) => {
+                const tableToUse = getEffectiveTable(rel)
+                baseQuery.leftJoin(
+                    tableToUse,
+                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                );
+            });
+        }
+
+        const [data] = await baseQuery
             .where(
                 and(
                     eq(model.uuid, uuid),
                     eq(model.enabled, true)
                 )
             ).limit(1)
+
         return data
     },
     createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
@@ -136,6 +230,7 @@ const modelRepository = {
             if (err.cause.errno === 1062) {
                 meta.log.error(`REPO: DUPLICATE ERROR (ER_DUP_ENTRY) idempotencyKey INSERT ON DB, idmp:${meta.idempotencyKey} IS NOT FOUND`)
             }
+            throw new SQLError(err.message)
         })
 
         const [created] = await db
@@ -248,21 +343,21 @@ const modelRepository = {
 }
 
 const modelService = {
-    getAllService: async <T extends TableWithBase>(query: Static<typeof PaginationQueryRequestSchema>, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, filterKeys: string[], sortKeys: string[], searchKeys: string[]) => {
+    getAllService: async <T extends TableWithBase>(query: Static<typeof PaginationQueryRequestSchema>, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, filterKeys: string[], sortKeys: string[], searchKeys: string[], relationConfigs?: RelationConfig[]) => {
         meta.log.info(query, `SERVICE: ${name}Service.getAllService called`)
 
         const paginationObject = PaginationUtil.convertQueryToObject(query)
 
-        const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys)
+        const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys, relationConfigs)
 
-        const totalPages = Math.ceil(data.dataCount[0].total / paginationObject.size)
+        const totalPages = Math.ceil(data.totalItems / paginationObject.size)
 
         return {
             data: data.data,
             meta: {
                 page: paginationObject.page,
                 size: paginationObject.size,
-                totalItems: data.dataCount[0].total,
+                totalItems: data.totalItems,
                 totalPages,
                 hasNext: paginationObject.page < totalPages,
                 hasPrev: paginationObject.page > 1,
@@ -271,9 +366,9 @@ const modelService = {
             }
         }
     },
-    getByUuidService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string) => {
+    getByUuidService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, relationConfigs?: RelationConfig[]) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.getBarangByUuidService called`)
-        const data = await modelRepository.getByUuidRepository(uuid, model)
+        const data = await modelRepository.getByUuidRepository(uuid, model, relationConfigs)
 
         if (!data) {
             throw new NotFoundError
@@ -311,7 +406,6 @@ const modelService = {
     }
 }
 
-
 /**
  * Automatically generates a standard CRUD route group for a given entity.
  * Includes built-in support for:
@@ -326,18 +420,34 @@ const modelService = {
  */
 
 export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, any, any, any, any, any>, config: RouteConfig<T>) => {
+
+    if (typeof Bun !== "undefined") {
+        const { idempotencyMiddleware } = require("../middlewares/idempotency.middleware");
+        const { jwtMiddleware } = require("../middlewares/jwt.middleware");
+        const { rateLimiter } = require("../middlewares/rate-limit.middleware");
+
+        group.use(idempotencyMiddleware);
+        group.use(jwtMiddleware);
+        group.use(rateLimiter(config.name, 60, 60));
+    }
+
     return group
-        .use(idempotencyMiddleware)
-        .use(jwtMiddleware)
         .use(paginationPlugin)
-        .use(rateLimiter(config.prefix, 60, 60))
         /**
          * [GET] Fetch all records with pagination, filtering, and sorting.
          */
         .get("/", async ({ query, meta }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
 
-            const data = await modelService.getAllService(query, meta, config.model, config.name, config.filterKeys, config.sortKeys, config.searchKeys)
+            const data = await modelService.getAllService(query,
+                meta,
+                config.model,
+                config.name,
+                config.filterKeys,
+                config.sortKeys,
+                config.searchKeys,
+                config.relationConfigs
+            )
 
             return ApiResponseUtil.success({
                 message: "Get All Data Success",
@@ -364,7 +474,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
          */
         .get("/:uuid", async ({ params, meta }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
-            const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name);
+            const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name, config.relationConfigs);
 
             return ApiResponseUtil.success({
                 message: "Get Data Success",
@@ -395,9 +505,13 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 data: created
             })
 
-            const idmpKey = headers.get("x-idempotency-key")
-
-            await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800)
+            if (typeof Bun !== "undefined") {
+                const { cache } = require("../config/storage/redis.config");
+                const idmpKey = headers.get("x-idempotency-key");
+                if (idmpKey) {
+                    await cache.set(`idmp:${idmpKey}`, JSON.stringify(response), 'EX', 1800);
+                }
+            }
 
             return response
         }, {

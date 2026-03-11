@@ -1,5 +1,5 @@
 import { eq, InferInsertModel } from "drizzle-orm";
-import { db } from "../../../common/config/database/database.config";
+import { db } from "../../config/database/database.config";
 import { userTable } from "./user.model";
 
 export const userRepository = {
