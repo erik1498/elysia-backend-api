@@ -54,7 +54,7 @@ const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(
         paginationObject: {
             page: number,
-            size: number,
+            size: number | string,
             search?: string,
             filter?: Record<string, string | string[]>,
             sort?: Record<string, string | string[]>,
@@ -126,7 +126,7 @@ const modelRepository = {
             });
         }
 
-        const data = await baseQuery
+        const finalQuery = baseQuery
             .where(
                 and(
                     searchConditions.length > 0 ? or(...searchConditions) : undefined,
@@ -134,9 +134,16 @@ const modelRepository = {
                     eq(model.enabled, true)
                 )
             )
-            .orderBy(...orderSelectors)
-            .limit(paginationObject.size)
-            .offset((paginationObject.page - 1) * paginationObject.size);
+            .orderBy(...orderSelectors);
+
+        if (paginationObject.size !== "all") {
+            const limit = Number(paginationObject.size);
+            const offset = (Number(paginationObject.page) - 1) * limit;
+
+            finalQuery.limit(limit).offset(offset);
+        }
+
+        const data = await finalQuery;
 
         const countQuery = db.select({ total: sql<number>`count(*)` }).from(model);
 
@@ -354,7 +361,20 @@ const modelService = {
 
         const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys, relationConfigs)
 
-        const totalPages = Math.ceil(data.totalItems / paginationObject.size)
+        let totalPages = 1;
+        let hasNext = false;
+        let hasPrev = false;
+
+        if (paginationObject.size === "all") {
+            totalPages = 1;
+            hasNext = false;
+            hasPrev = false;
+        } else {
+            const sizeNum = Number(paginationObject.size);
+            totalPages = Math.ceil(data.totalItems / sizeNum);
+            hasNext = paginationObject.page < totalPages;
+            hasPrev = paginationObject.page > 1;
+        }
 
         return {
             data: data.data,
@@ -363,8 +383,8 @@ const modelService = {
                 size: paginationObject.size,
                 totalItems: data.totalItems,
                 totalPages,
-                hasNext: paginationObject.page < totalPages,
-                hasPrev: paginationObject.page > 1,
+                hasNext,
+                hasPrev,
                 filterAllowedKeys: filterKeys,
                 sortAllowedKeys: sortKeys
             }

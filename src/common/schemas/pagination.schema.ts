@@ -14,10 +14,16 @@ export const PaginationQueryRequestSchema = t.Object({
     /** * The number of items per page. 
      * Constraints: Min 5, Max 100. Defaults to 5. 
      */
-    size: t.Numeric({
-        maximum: 100,
-        minimum: 5,
-        default: 5
+    size: t.Union([
+        t.Numeric({
+            maximum: 100,
+            minimum: 5,
+            default: 5
+        }),
+        t.Literal("all")
+    ], {
+        default: 5,
+        error: "Size must be a number between 5-100 or 'all'"
     }),
 
     /** Global search string to be matched against allowed searchable columns. */
