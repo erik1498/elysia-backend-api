@@ -69,7 +69,7 @@ export const PaginatedResponseSchema = (dataSchema: any) => t.Object({
      */
     meta: t.Optional(t.Object({
         page: t.Number(),
-        size: t.Number(),
+        size: t.Union([t.Number(), t.String()]),
         totalItems: t.Number(),
         totalPages: t.Number(),
         hasNext: t.Boolean(),
