@@ -1,5 +1,5 @@
 import Elysia, { Static, t } from "elysia";
-import { RelationConfig, RouteConfig, TableWithBase } from "../interface/route-generator.interface";
+import { CreatedDataTransactionFunction, DeletedDataTransactionFunction, RelationConfig, RouteConfig, TableWithBase, UpdatedDataTransactionFunction } from "../interface/route-generator.interface";
 import { paginationPlugin } from "../plugins/pagination.plugin";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
@@ -206,19 +206,34 @@ const modelRepository = {
 
         return data
     },
-    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    createRepository: async <T extends TableWithBase>(
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        createDataTransaction: CreatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid
         data.idempotencyKey = meta.idempotencyKey
 
         await db.transaction(async (tx) => {
+
+            if (createDataTransaction?.beforeDataCreated) {
+                await createDataTransaction.beforeDataCreated(tx, data, meta);
+            }
+
             await tx
                 .insert(model)
                 .values({
                     ...data,
                     createdBy: meta.userUuid
                 })
+
+            if (createDataTransaction?.afterDataCreated) {
+                await createDataTransaction.afterDataCreated(tx, data, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -251,7 +266,14 @@ const modelRepository = {
 
         return created
     },
-    updateRepository: async <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    updateRepository: async <T extends TableWithBase>(
+        uuid: string,
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        updateDataTransaction: UpdatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         const updatedResult = await db.transaction(async (tx) => {
 
             const [oldData] = await tx
@@ -263,6 +285,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 ).limit(1)
+
+            if (updateDataTransaction?.beforeDataUpdated) {
+                await updateDataTransaction.beforeDataUpdated(tx, data, oldData, meta);
+            }
 
             const updated = await tx
                 .update(model)
@@ -276,6 +302,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 )
+
+            if (updateDataTransaction?.afterDataUpdated) {
+                await updateDataTransaction.afterDataUpdated(tx, data, oldData, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -296,7 +326,13 @@ const modelRepository = {
 
         return updatedResult
     },
-    deleteRepository: async <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    deleteRepository: async <T extends TableWithBase>(
+        uuid: string, 
+        meta: RequestMeta, 
+        model: MySqlTableWithColumns<T>, 
+        deleteDataTransaction: DeletedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
 
         const data = {
             enabled: false,
@@ -315,6 +351,10 @@ const modelRepository = {
                     )
                 ).limit(1)
 
+            if (deleteDataTransaction?.beforeDataDeleted) {
+                await deleteDataTransaction.beforeDataDeleted(tx, data, oldData, meta);
+            }
+
             const deleted = await tx
                 .update(model)
                 .set({ ...data })
@@ -324,6 +364,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 )
+
+            if (deleteDataTransaction?.afterDataDeleted) {
+                await deleteDataTransaction.afterDataDeleted(tx, data, oldData, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -396,9 +440,22 @@ const modelService = {
 
         return data
     },
-    createService: async  <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    createService: async  <T extends TableWithBase>(
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        createDataTransaction: CreatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info(data, `SERVICE: ${name}Service.createBarangService called`)
-        const created = await modelRepository.createRepository(data, meta, model, entityName)
+        const created = await modelRepository.createRepository(
+            data,
+            meta,
+            model,
+            createDataTransaction,
+            entityName
+        )
 
         if (!created) {
             throw new BadRequestError
@@ -406,9 +463,24 @@ const modelService = {
 
         return created
     },
-    updateService: async  <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    updateService: async  <T extends TableWithBase>(
+        uuid: string,
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        updateDataTransaction: UpdatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info({ uuid, data }, `SERVICE: ${name}Service.updateService called`)
-        const updated = await modelRepository.updateRepository(uuid, data, meta, model, entityName)
+        const updated = await modelRepository.updateRepository(
+            uuid,
+            data,
+            meta,
+            model,
+            updateDataTransaction,
+            entityName
+        )
 
         if (!updated || updated[0].affectedRows == 0) {
             throw new NotFoundError
@@ -416,9 +488,22 @@ const modelService = {
 
         return await modelRepository.getByUuidRepository(uuid, model)
     },
-    deleteService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    deleteService: async  <T extends TableWithBase>(
+        uuid: string,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        deleteDataTransaction: DeletedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.deleteBarangService called`)
-        const deleted = await modelRepository.deleteRepository(uuid, meta, model, entityName)
+        const deleted = await modelRepository.deleteRepository(
+            uuid,
+            meta,
+            model,
+            deleteDataTransaction,
+            entityName
+        )
 
         if (!deleted || deleted[0].affectedRows == 0) {
             throw new NotFoundError
@@ -451,11 +536,11 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
         group.use(rateLimiter(config.name, 60, 60));
     }
 
-    return group
+    /**
+     * [GET] Fetch all records with pagination, filtering, and sorting.
+     */
+    group
         .use(paginationPlugin)
-        /**
-         * [GET] Fetch all records with pagination, filtering, and sorting.
-         */
         .get("/", async ({ query, meta }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getAllHandler hit`)
 
@@ -489,9 +574,11 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: PaginatedResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [GET] Fetch a single record by its UUID.
-         */
+
+    /**
+     * [GET] Fetch a single record by its UUID.
+     */
+    group
         .get("/:uuid", async ({ params, meta }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
             const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name, config.relationConfigs);
@@ -512,12 +599,21 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [POST] Create a new record. Supports Idempotency check.
-         */
+
+    /**
+     * [POST] Create a new record. Supports Idempotency check.
+     */
+    group
         .post("/", async ({ request: { headers }, body, meta, set }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.createHandler hit`)
-            const created = await modelService.createService(body, meta, config.model, config.name, config.entityName)
+            const created = await modelService.createService(
+                body,
+                meta,
+                config.model,
+                config.name,
+                config.functionInTransaction?.createData,
+                config.entityName,
+            )
             set.status = 201
 
             const response = ApiResponseUtil.success({
@@ -535,6 +631,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
 
             return response
         }, {
+            beforeHandle: config.beforeHandle?.createData ?? undefined,
             roles: config.roles.getDataRoles,
             body: config.schemas.body,
             headers: IdempotencyHeaderSchema,
@@ -546,12 +643,22 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 201: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [PUT] Update an existing record by UUID.
-         */
+
+    /**
+     * [PUT] Update an existing record by UUID.
+     */
+    group
         .put("/:uuid", async ({ params, body, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.updateHandler hit`)
-            const updated = await modelService.updateService(params.uuid, body, meta, config.model, config.name, config.entityName)
+            const updated = await modelService.updateService(
+                params.uuid,
+                body,
+                meta,
+                config.model,
+                config.name,
+                config.functionInTransaction?.updateData,
+                config.entityName
+            )
             set.status = 200
 
             return ApiResponseUtil.success({
@@ -559,6 +666,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 data: updated
             })
         }, {
+            beforeHandle: config.beforeHandle?.updateData ?? undefined,
             roles: config.roles.updateDataRoles,
             params: t.Object({
                 uuid: t.String({ format: 'uuid' })
@@ -572,14 +680,24 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [DELETE] Soft-delete a record by setting enabled to false.
-         */
+
+    /**
+     * [DELETE] Soft-delete a record by setting enabled to false.
+     */
+    group
         .delete("/:uuid", async ({ params, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.deleteHandler hit`)
-            await modelService.deleteService(params.uuid, meta, config.model, config.name, config.entityName)
+            await modelService.deleteService(
+                params.uuid,
+                meta,
+                config.model,
+                config.name,
+                config.functionInTransaction?.deleteData,
+                config.entityName
+            )
             set.status = 204
         }, {
+            beforeHandle: config.beforeHandle?.deleteData ?? undefined,
             roles: config.roles.deleteDataRoles,
             params: t.Object({
                 uuid: t.String({ format: 'uuid' })
@@ -589,4 +707,6 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 summary: `Delete Data ${config.name} Barang`
             }
         })
+
+    return group
 };

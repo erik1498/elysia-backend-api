@@ -1,6 +1,9 @@
-import { AnyMySqlColumn, MySqlTableWithColumns, TableConfig } from "drizzle-orm/mysql-core";
-import { TSchema } from "elysia";
+import { AnyMySqlColumn, MySqlTableWithColumns, MySqlTransaction, TableConfig } from "drizzle-orm/mysql-core";
+import { OptionalHandler, TSchema } from "elysia";
 import { BaseColumns } from "../models/base.model";
+import { MySql2PreparedQueryHKT, MySql2QueryResultHKT } from "drizzle-orm/mysql2";
+import { ExtractTablesWithRelations } from "drizzle-orm";
+import { RequestMeta } from "./context";
 
 /**
  * Represents the required key set for any table utilizing the BaseColumns.
@@ -16,6 +19,56 @@ type BaseKeys = keyof typeof BaseColumns;
  */
 export interface TableWithBase extends TableConfig {
     columns: Record<BaseKeys, AnyMySqlColumn> & TableConfig["columns"];
+}
+
+export type DatabaseTransaction = MySqlTransaction<
+    MySql2QueryResultHKT, 
+    MySql2PreparedQueryHKT, 
+    Record<string, never>, 
+    ExtractTablesWithRelations<Record<string, never>>
+>;
+
+export interface CreatedDataTransactionFunction {
+    beforeDataCreated?: (
+        tx: DatabaseTransaction,
+        data: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
+    afterDataCreated?: (
+        tx: DatabaseTransaction,
+        data: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
+}
+
+export interface UpdatedDataTransactionFunction {
+    beforeDataUpdated?: (
+        tx: DatabaseTransaction,
+        data: any,
+        oldData: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
+    afterDataUpdated?: (
+        tx: DatabaseTransaction,
+        data: any,
+        oldData: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
+}
+
+export interface DeletedDataTransactionFunction {
+    beforeDataDeleted?: (
+        tx: DatabaseTransaction,
+        data: any,
+        oldData: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
+    afterDataDeleted?: (
+        tx: DatabaseTransaction,
+        data: any,
+        oldData: any,
+        meta: RequestMeta
+    ) => Promise<any> | any;
 }
 
 /**
@@ -48,6 +101,8 @@ export interface RouteConfig<T extends TableWithBase> {
     filterKeys: string[];
     /** A whitelist of column names permitted for dynamic sorting. */
     sortKeys: string[];
+    /** A whitelist of column names use datetime. */
+    dateKeys?: string[];
     /** A whitelist of column names permitted for global search functionality. */
     searchKeys: string[];
     /** Swagger/OpenAPI tags for API documentation grouping. */
@@ -93,7 +148,17 @@ export interface RouteConfig<T extends TableWithBase> {
         updateDataRoles: string[],
         deleteDataRoles: string[],
     }
-    relationConfigs?: RelationConfig[]
+    relationConfigs?: RelationConfig[],
+    functionInTransaction?: {
+        createData?: CreatedDataTransactionFunction,
+        updateData?: UpdatedDataTransactionFunction,
+        deleteData?: DeletedDataTransactionFunction
+    },
+    beforeHandle?: {
+        createData?: OptionalHandler<any, any>,
+        updateData?: OptionalHandler<any, any>,
+        deleteData?: OptionalHandler<any, any>
+    }
 }
 
 interface ColumnOnRelationTableName {
