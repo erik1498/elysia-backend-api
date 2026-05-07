@@ -9,18 +9,35 @@ import { PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 export const PaginationUtil = {
     /**
      * Parses a semicolon-delimited string into a key-value object.
-     * * @param input - The raw query string (e.g., "status:active;category:electronics")
-     * @returns A record object (e.g., { status: "active", category: "electronics" })
+     * * @param input - The raw query string (e.g, "status:active;category:electronics")
+     * @returns A record object (e.g, { status: "active", category: "electronics" })
      * * @example
      * PaginationUtil.queryToObject("price:desc;name:asc") // returns { price: "desc", name: "asc" }
      */
-    queryToObject: (input?: string): Record<string, string> => {
+    queryToObject: (input?: string): Record<string, string | string[]> => {
         if (!input) return {};
-        const result: Record<string, string> = {};
+        const result: Record<string, string | string[]> = {};
 
         input.split(';').forEach(pair => {
-            const [key, value] = pair.split(':');
-            if (key && value) result[key.trim()] = value.trim();
+            // Gunakan limit 2 pada split pertama hanya jika kita yakin formatnya key:value
+            // Namun untuk mendukung operator, kita cari index titik dua pertama saja
+            const firstColonIndex = pair.indexOf(':');
+            if (firstColonIndex === -1) return;
+
+            const key = pair.substring(0, firstColonIndex).trim();
+            const value = pair.substring(firstColonIndex + 1).trim();
+
+            if (key && value) {
+                if (result[key]) {
+                    if (Array.isArray(result[key])) {
+                        (result[key] as string[]).push(value);
+                    } else {
+                        result[key] = [result[key] as string, value];
+                    }
+                } else {
+                    result[key] = value;
+                }
+            }
         });
 
         return result;
@@ -30,7 +47,7 @@ export const PaginationUtil = {
      * Validates that all keys in a query string are present in an allowed whitelist.
      * Used primarily to prevent SQL injection or unauthorized filtering.
      * * @param params - Validation parameters
-     * @param params.type - The category of the query (e.g., "filter" or "sort") for error reporting
+     * @param params.type - The category of the query (e.g, "filter" or "sort") for error reporting
      * @param params.allowedKeys - Array of strings representing permitted column names
      * @param params.query - The raw query string from the client
      * * @throws {ValidationError} If any key in the query is not present in the allowedKeys array.

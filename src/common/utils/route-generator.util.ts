@@ -1,9 +1,9 @@
 import Elysia, { Static, t } from "elysia";
-import { RelationConfig, RouteConfig, TableWithBase } from "../interface/route-generator.interface";
+import { CreatedDataTransactionFunction, DeletedDataTransactionFunction, RelationConfig, RouteConfig, TableWithBase, UpdatedDataTransactionFunction } from "../interface/route-generator.interface";
 import { paginationPlugin } from "../plugins/pagination.plugin";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
-import { aliasedTable, and, asc, desc, eq, inArray, like, or, SQL, sql } from "drizzle-orm";
+import { aliasedTable, and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
@@ -13,6 +13,7 @@ import { BadRequestError, NotFoundError, SQLError } from "../errors/app.error";
 import { IdempotencyHeaderSchema } from "../schemas/idempotency.schema";
 import { BaseResponseSchema } from "../schemas/response.schema";
 import { BaseColumns, BaseColumnsType } from "../models/base.model";
+import { prepareDatabaseData } from "./date.util";
 
 export const createGenericModel = <
     TTableName extends string,
@@ -50,7 +51,7 @@ const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(
         paginationObject: {
             page: number,
-            size: number,
+            size: number | string,
             search?: string,
             filter?: Record<string, string | string[]>,
             sort?: Record<string, string | string[]>,
@@ -70,7 +71,7 @@ const modelRepository = {
         if (paginationObject.search) {
             searchConditions = searchAllowedColumn.map((key) => {
                 const column = model[key as ModelColumnName];
-                return like(column, `%${paginationObject.search}%`);
+                return like(column, `${paginationObject.search}%`);
             });
         }
 
@@ -79,10 +80,34 @@ const modelRepository = {
                 if (key in model && value !== undefined && value !== null) {
                     const column = model[key as ModelColumnName];
 
+                    const processValue = (val: string) => {
+                        const firstColonIndex = val.indexOf(':');
+
+                        const validOperators = ['gte', 'lte', 'gt', 'lt', 'noteq'];
+                        const possibleOp = val.substring(0, firstColonIndex);
+
+                        if (firstColonIndex !== -1 && validOperators.includes(possibleOp)) {
+                            const operator = possibleOp;
+                            const actualValue = val.substring(firstColonIndex + 1);
+
+                            switch (operator) {
+                                case 'gte': return gte(column as any, actualValue);
+                                case 'lte': return lte(column as any, actualValue);
+                                case 'gt': return gt(column as any, actualValue);
+                                case 'lt': return lt(column as any, actualValue);
+                                case 'noteq': return ne(column as any, actualValue);
+                            }
+                        }
+
+                        return eq(column as any, val);
+                    };
+
                     if (Array.isArray(value)) {
-                        filterConditions.push(inArray(column as any, value));
+                        value.forEach((v) => {
+                            filterConditions.push(processValue(v));
+                        });
                     } else {
-                        filterConditions.push(eq(column as any, value));
+                        filterConditions.push(processValue(String(value)));
                     }
                 }
             });
@@ -117,12 +142,12 @@ const modelRepository = {
                 const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
                     tableToUse,
-                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
 
-        const data = await baseQuery
+        baseQuery
             .where(
                 and(
                     searchConditions.length > 0 ? or(...searchConditions) : undefined,
@@ -131,8 +156,14 @@ const modelRepository = {
                 )
             )
             .orderBy(...orderSelectors)
-            .limit(paginationObject.size)
-            .offset((paginationObject.page - 1) * paginationObject.size);
+
+        if (paginationObject.size != "all") {
+            baseQuery
+                .limit(Number(paginationObject.size))
+                .offset((paginationObject.page - 1) * Number(paginationObject.size));
+        }
+
+        const data = await baseQuery
 
         const countQuery = db.select({ total: sql<number>`count(*)` }).from(model);
 
@@ -141,7 +172,7 @@ const modelRepository = {
                 const tableToUse = getEffectiveTable(rel)
                 countQuery.leftJoin(
                     tableToUse,
-                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
@@ -184,7 +215,7 @@ const modelRepository = {
                 const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
                     tableToUse,
-                    eq(model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
@@ -199,19 +230,34 @@ const modelRepository = {
 
         return data
     },
-    createRepository: async <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    createRepository: async <T extends TableWithBase>(
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        createDataTransaction: CreatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
 
         const uuid = crypto.randomUUID()
         data.uuid = uuid
         data.idempotencyKey = meta.idempotencyKey
 
         await db.transaction(async (tx) => {
+
+            if (createDataTransaction?.beforeDataCreated) {
+                await createDataTransaction.beforeDataCreated(tx, data, meta);
+            }
+
             await tx
                 .insert(model)
                 .values({
                     ...data,
                     createdBy: meta.userUuid
                 })
+
+            if (createDataTransaction?.afterDataCreated) {
+                await createDataTransaction.afterDataCreated(tx, data, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -227,10 +273,13 @@ const modelRepository = {
                 })
             return
         }).catch((err) => {
-            if (err.cause.errno === 1062) {
+            if (err?.cause?.errno === 1062) {
                 meta.log.error(`REPO: DUPLICATE ERROR (ER_DUP_ENTRY) idempotencyKey INSERT ON DB, idmp:${meta.idempotencyKey} IS NOT FOUND`)
             }
-            throw new SQLError(err.message)
+            if (err instanceof SQLError) {
+                throw new SQLError(err.message)
+            }
+            throw err
         })
 
         const [created] = await db
@@ -244,7 +293,14 @@ const modelRepository = {
 
         return created
     },
-    updateRepository: async <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    updateRepository: async <T extends TableWithBase>(
+        uuid: string,
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        updateDataTransaction: UpdatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         const updatedResult = await db.transaction(async (tx) => {
 
             const [oldData] = await tx
@@ -256,6 +312,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 ).limit(1)
+
+            if (updateDataTransaction?.beforeDataUpdated) {
+                await updateDataTransaction.beforeDataUpdated(tx, data, oldData, meta);
+            }
 
             const updated = await tx
                 .update(model)
@@ -269,6 +329,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 )
+
+            if (updateDataTransaction?.afterDataUpdated) {
+                await updateDataTransaction.afterDataUpdated(tx, data, oldData, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -289,7 +353,13 @@ const modelRepository = {
 
         return updatedResult
     },
-    deleteRepository: async <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, entityName: string) => {
+    deleteRepository: async <T extends TableWithBase>(
+        uuid: string,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        deleteDataTransaction: DeletedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
 
         const data = {
             enabled: false,
@@ -308,6 +378,10 @@ const modelRepository = {
                     )
                 ).limit(1)
 
+            if (deleteDataTransaction?.beforeDataDeleted) {
+                await deleteDataTransaction.beforeDataDeleted(tx, data, oldData, meta);
+            }
+
             const deleted = await tx
                 .update(model)
                 .set({ ...data })
@@ -317,6 +391,10 @@ const modelRepository = {
                         eq(model.enabled, true)
                     )
                 )
+
+            if (deleteDataTransaction?.afterDataDeleted) {
+                await deleteDataTransaction.afterDataDeleted(tx, data, oldData, meta);
+            }
 
             await tx
                 .insert(auditLogTable)
@@ -350,7 +428,7 @@ const modelService = {
 
         const data = await modelRepository.getAllRepository(paginationObject, model, searchKeys, relationConfigs)
 
-        const totalPages = Math.ceil(data.totalItems / paginationObject.size)
+        const totalPages = paginationObject.size == "all" ? 1 : Math.ceil(data.totalItems / paginationObject.size)
 
         return {
             data: data.data,
@@ -376,9 +454,20 @@ const modelService = {
 
         return data
     },
-    createService: async  <T extends TableWithBase>(data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    createService: async  <T extends TableWithBase>(
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        dateKeys: string[] = [],
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        createDataTransaction: CreatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info(data, `SERVICE: ${name}Service.createBarangService called`)
-        const created = await modelRepository.createRepository(data, meta, model, entityName)
+
+        const processedData = prepareDatabaseData(data, dateKeys);
+
+        const created = await modelRepository.createRepository(processedData, meta, model, createDataTransaction, entityName)
 
         if (!created) {
             throw new BadRequestError
@@ -386,9 +475,28 @@ const modelService = {
 
         return created
     },
-    updateService: async  <T extends TableWithBase>(uuid: string, data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    updateService: async  <T extends TableWithBase>(
+        uuid: string,
+        data: MySqlTableWithColumns<T>["$inferInsert"] & BaseColumnsType,
+        meta: RequestMeta,
+        dateKeys: string[] = [],
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        updateDataTransaction: UpdatedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info({ uuid, data }, `SERVICE: ${name}Service.updateService called`)
-        const updated = await modelRepository.updateRepository(uuid, data, meta, model, entityName)
+
+        const processedData = prepareDatabaseData(data, dateKeys);
+
+        const updated = await modelRepository.updateRepository(
+            uuid,
+            processedData,
+            meta,
+            model,
+            updateDataTransaction,
+            entityName
+        )
 
         if (!updated || updated[0].affectedRows == 0) {
             throw new NotFoundError
@@ -396,9 +504,16 @@ const modelService = {
 
         return await modelRepository.getByUuidRepository(uuid, model)
     },
-    deleteService: async  <T extends TableWithBase>(uuid: string, meta: RequestMeta, model: MySqlTableWithColumns<T>, name: string, entityName: string) => {
+    deleteService: async  <T extends TableWithBase>(
+        uuid: string,
+        meta: RequestMeta,
+        model: MySqlTableWithColumns<T>,
+        name: string,
+        deleteDataTransaction: DeletedDataTransactionFunction | undefined,
+        entityName: string
+    ) => {
         meta.log.info({ uuid }, `SERVICE: ${name}Service.deleteBarangService called`)
-        const deleted = await modelRepository.deleteRepository(uuid, meta, model, entityName)
+        const deleted = await modelRepository.deleteRepository(uuid, meta, model, deleteDataTransaction, entityName)
 
         if (!deleted || deleted[0].affectedRows == 0) {
             throw new NotFoundError
@@ -428,10 +543,10 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
 
         group.use(idempotencyMiddleware);
         group.use(jwtMiddleware);
-        group.use(rateLimiter(config.name, 60, 60));
+        group.use(rateLimiter(config.name, 150, 60));
     }
 
-    return group
+    group
         .use(paginationPlugin)
         /**
          * [GET] Fetch all records with pagination, filtering, and sorting.
@@ -469,9 +584,11 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: PaginatedResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [GET] Fetch a single record by its UUID.
-         */
+
+    /**
+     * [GET] Fetch a single record by its UUID.
+    */
+    group
         .get("/:uuid", async ({ params, meta }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.getByUuidHandler hit`)
             const data = await modelService.getByUuidService(params.uuid, meta, config.model, config.name, config.relationConfigs);
@@ -492,12 +609,23 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [POST] Create a new record. Supports Idempotency check.
-         */
+
+    /**
+     * [POST] Create a new record. Supports Idempotency check.
+    */
+    group
         .post("/", async ({ request: { headers }, body, meta, set }) => {
             meta.log.info(`HANDLER: ${config.name}Handler.createHandler hit`)
-            const created = await modelService.createService(body, meta, config.model, config.name, config.entityName)
+
+            const created = await modelService.createService(
+                body,
+                meta,
+                config.dateKeys,
+                config.model,
+                config.name,
+                config.functionInTransaction?.createData,
+                config.entityName
+            )
             set.status = 201
 
             const response = ApiResponseUtil.success({
@@ -515,6 +643,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
 
             return response
         }, {
+            beforeHandle: config.beforeHandle?.createData ?? undefined,
             roles: config.roles.getDataRoles,
             body: config.schemas.body,
             headers: IdempotencyHeaderSchema,
@@ -526,12 +655,23 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 201: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [PUT] Update an existing record by UUID.
-         */
+
+    /**
+     * [PUT] Update an existing record by UUID.
+     */
+    group
         .put("/:uuid", async ({ params, body, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.updateHandler hit`)
-            const updated = await modelService.updateService(params.uuid, body, meta, config.model, config.name, config.entityName)
+            const updated = await modelService.updateService(
+                params.uuid,
+                body,
+                meta,
+                config.dateKeys,
+                config.model,
+                config.name,
+                config.functionInTransaction?.updateData,
+                config.entityName,
+            )
             set.status = 200
 
             return ApiResponseUtil.success({
@@ -539,6 +679,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 data: updated
             })
         }, {
+            beforeHandle: config.beforeHandle?.updateData ?? undefined,
             roles: config.roles.updateDataRoles,
             params: t.Object({
                 uuid: t.String({ format: 'uuid' })
@@ -552,14 +693,24 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 200: BaseResponseSchema(config.schemas.response)
             }
         })
-        /**
-         * [DELETE] Soft-delete a record by setting enabled to false.
-         */
+
+    /**
+     * [DELETE] Soft-delete a record by setting enabled to false.
+     */
+    group
         .delete("/:uuid", async ({ params, meta, set }: any) => {
             meta.log.info(`HANDLER: ${config.name}Handler.deleteHandler hit`)
-            await modelService.deleteService(params.uuid, meta, config.model, config.name, config.entityName)
+            await modelService.deleteService(
+                params.uuid,
+                meta,
+                config.model,
+                config.name,
+                config.functionInTransaction?.deleteData,
+                config.entityName
+            )
             set.status = 204
         }, {
+            beforeHandle: config.beforeHandle?.deleteData ?? undefined,
             roles: config.roles.deleteDataRoles,
             params: t.Object({
                 uuid: t.String({ format: 'uuid' })
@@ -569,4 +720,6 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 summary: `Delete Data ${config.name} Barang`
             }
         })
+
+    return group
 };

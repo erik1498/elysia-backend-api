@@ -14,11 +14,14 @@ export const PaginationQueryRequestSchema = t.Object({
     /** * The number of items per page. 
      * Constraints: Min 5, Max 100. Defaults to 5. 
      */
-    size: t.Numeric({
-        maximum: 100,
-        minimum: 5,
-        default: 5
-    }),
+    size: t.Union([
+        t.Numeric({
+            maximum: 100,
+            minimum: 1,
+            default: 1
+        }),
+        t.Literal("all")
+    ]),
 
     /** Global search string to be matched against allowed searchable columns. */
     search: t.Optional(t.String()),
@@ -28,8 +31,8 @@ export const PaginationQueryRequestSchema = t.Object({
      * @example "category:electronics;status:active"
      */
     filter: t.Optional(t.String({
-        pattern: "^[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+(;[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+)*$",
-        error: "The filter format is invalid. Use 'field:value' or 'field:value;field:value' for multiple filters."
+        pattern: "^[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+(:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+)*(;[a-zA-Z0-9_]+:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+(:[a-zA-Z0-9_\\s\\-\\.\\,\\/]+)*)*$",
+        error: "Format filter tidak valid. Gunakan 'field:value' atau 'field:operator:value'"
     })),
 
     /** * Dynamic sort string.
@@ -38,7 +41,7 @@ export const PaginationQueryRequestSchema = t.Object({
      */
     sort: t.Optional(t.String({
         pattern: "^[a-zA-Z0-9_]+:(asc|desc|ASC|DESC)(;[a-zA-Z0-9_]+:(asc|desc|ASC|DESC))*$",
-        error: "The sort format is invalid. Use 'field:direction' (asc/desc), e.g., 'price:desc' or 'price:desc;name:asc' for multiple sorting."
+        error: "The sort format is invalid. Use 'field:direction' (asc/desc), e.g, 'price:desc' or 'price:desc;name:asc' for multiple sorting."
     }))
 })
 
@@ -63,7 +66,10 @@ export const PaginatedResponseSchema = (dataSchema: any) => t.Object({
      */
     meta: t.Optional(t.Object({
         page: t.Number(),
-        size: t.Number(),
+        size: t.Union([
+            t.Number(),
+            t.String()
+        ]),
         totalItems: t.Number(),
         totalPages: t.Number(),
         hasNext: t.Boolean(),
