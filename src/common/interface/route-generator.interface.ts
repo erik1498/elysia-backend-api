@@ -167,8 +167,9 @@ interface ColumnOnRelationTableName {
 }
 
 export interface RelationConfig {
-    relationTable: MySqlTableWithColumns<any>; 
+    relationTable: MySqlTableWithColumns<any>;
     aliasedName?: string;
     columnOnTableName: string;
+    tableSource?: MySqlTableWithColumns<any>;
     relationData: ColumnOnRelationTableName[];
 }
