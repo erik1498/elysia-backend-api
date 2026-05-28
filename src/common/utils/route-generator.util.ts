@@ -572,6 +572,14 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
         }, {
             roles: config.roles.getAllDataRoles,
             query: PaginationQueryRequestSchema,
+            afterResponse: ({ query }) => {
+
+                const isMassiveRequest = query && query.size === "all";
+
+                if (isMassiveRequest && typeof Bun !== "undefined") {
+                    Bun.gc(true);
+                }
+            },
             paginationQueryValidate: {
                 filterKeys: config.filterKeys,
                 sortKeys: config.sortKeys
