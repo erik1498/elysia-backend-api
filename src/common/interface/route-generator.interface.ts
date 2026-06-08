@@ -143,6 +143,7 @@ export interface RouteConfig<T extends TableWithBase> {
      * Defines which user roles are permitted to perform specific CRUD actions.
      */
     roles: {
+        createDataRoles: string[],
         getAllDataRoles: string[],
         getDataRoles: string[],
         updateDataRoles: string[],
@@ -168,7 +169,6 @@ interface ColumnOnRelationTableName {
 
 export interface RelationConfig {
     relationTable: MySqlTableWithColumns<any>;
-    aliasedName?: string;
     columnOnTableName: string;
     tableSource?: MySqlTableWithColumns<any>;
     relationData: ColumnOnRelationTableName[];
