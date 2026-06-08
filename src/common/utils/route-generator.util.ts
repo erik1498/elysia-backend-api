@@ -573,14 +573,6 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
                 filterKeys: config.filterKeys,
                 sortKeys: config.sortKeys
             },
-            afterResponse: ({ query }) => {
-
-                const isMassiveRequest = query && query.size === "all";
-
-                if (isMassiveRequest && typeof Bun !== "undefined") {
-                    Bun.gc(true);
-                }
-            },
             detail: {
                 tags: config.tags,
                 summary: `Get All Data ${config.name}`
