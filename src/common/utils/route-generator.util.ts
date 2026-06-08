@@ -3,7 +3,7 @@ import { CreatedDataTransactionFunction, DeletedDataTransactionFunction, Relatio
 import { paginationPlugin } from "../plugins/pagination.plugin";
 import { RequestMeta } from "../interface/context";
 import { PaginationUtil } from "./pagination.util";
-import { aliasedTable, and, asc, desc, eq, gt, gte, inArray, like, lt, lte, ne, or, SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, like, lt, lte, ne, or, SQL, sql } from "drizzle-orm";
 import { ApiResponseUtil } from "./response.util";
 import { PaginatedResponseSchema, PaginationQueryRequestSchema } from "../schemas/pagination.schema";
 import { db } from "../config/database/database.config";
@@ -40,12 +40,6 @@ export const createGenericModel = <
         return [];
     });
 }
-
-const getEffectiveTable = (rel: RelationConfig) => {
-    return rel.aliasedName
-        ? aliasedTable(rel.relationTable, rel.aliasedName)
-        : rel.relationTable;
-};
 
 const modelRepository = {
     getAllRepository: async <T extends TableWithBase>(
@@ -128,9 +122,8 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
-                const tableToUse = getEffectiveTable(rel)
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
                 });
             });
         }
@@ -139,10 +132,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
-                const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
-                    tableToUse,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    rel.relationTable,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
                 );
             });
         }
@@ -169,10 +161,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
-                const tableToUse = getEffectiveTable(rel)
                 countQuery.leftJoin(
-                    tableToUse,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    rel.relationTable,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
                 );
             });
         }
@@ -199,9 +190,8 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
-                const tableToUse = getEffectiveTable(rel)
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
                 });
             });
         }
@@ -212,10 +202,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
-                const tableToUse = getEffectiveTable(rel)
                 baseQuery.leftJoin(
-                    tableToUse,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    rel.relationTable,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
                 );
             });
         }
@@ -583,6 +572,14 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
             paginationQueryValidate: {
                 filterKeys: config.filterKeys,
                 sortKeys: config.sortKeys
+            },
+            afterResponse: ({ query }) => {
+
+                const isMassiveRequest = query && query.size === "all";
+
+                if (isMassiveRequest && typeof Bun !== "undefined") {
+                    Bun.gc(true);
+                }
             },
             detail: {
                 tags: config.tags,
