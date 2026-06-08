@@ -143,6 +143,7 @@ export interface RouteConfig<T extends TableWithBase> {
      * Defines which user roles are permitted to perform specific CRUD actions.
      */
     roles: {
+        createDataRoles: string[],
         getAllDataRoles: string[],
         getDataRoles: string[],
         updateDataRoles: string[],

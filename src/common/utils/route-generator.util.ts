@@ -652,7 +652,7 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
             return response
         }, {
             beforeHandle: config.beforeHandle?.createData ?? undefined,
-            roles: config.roles.getDataRoles,
+            roles: config.roles.createDataRoles,
             body: config.schemas.body,
             headers: IdempotencyHeaderSchema,
             detail: {

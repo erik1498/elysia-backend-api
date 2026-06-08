@@ -11,6 +11,7 @@ export const sumberDanaRoute = (app: Elysia) =>
             model: sumberDanaTable,
             name: "sumberDana",
             roles: {
+                createDataRoles: ["super_admin"],
                 deleteDataRoles: ["super_admin"],
                 getAllDataRoles: ["super_admin"],
                 getDataRoles: ["super_admin"],
