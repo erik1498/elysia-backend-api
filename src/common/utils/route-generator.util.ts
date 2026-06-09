@@ -153,7 +153,7 @@ const modelRepository = {
             relationConfigs.forEach((rel) => {
                 const tableToUse = rel.relationTable
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
                 });
             });
         }
@@ -164,8 +164,8 @@ const modelRepository = {
             relationConfigs.forEach((rel) => {
                 const tableToUse = rel.relationTable
                 baseQuery.leftJoin(
-                    tableToUse,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    rel.relationTable,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
                 );
             });
         }
@@ -194,8 +194,8 @@ const modelRepository = {
             relationConfigs.forEach((rel) => {
                 const tableToUse = rel.relationTable
                 countQuery.leftJoin(
-                    tableToUse,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
+                    rel.relationTable,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
                 );
             });
         }
@@ -604,6 +604,14 @@ export const createGenericRoute = <T extends TableWithBase>(group: Elysia<any, a
             paginationQueryValidate: {
                 filterKeys: config.filterKeys,
                 sortKeys: config.sortKeys
+            },
+            afterResponse: ({ query }) => {
+
+                const isMassiveRequest = query && query.size === "all";
+
+                if (isMassiveRequest && typeof Bun !== "undefined") {
+                    Bun.gc(true);
+                }
             },
             detail: {
                 tags: config.tags,
