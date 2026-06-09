@@ -71,12 +71,26 @@ const modelRepository = {
 
         if (paginationObject.filter) {
             Object.entries(paginationObject.filter).forEach(([key, value]) => {
-                if (key in model && value !== undefined && value !== null) {
-                    const column = model[key as ModelColumnName];
+                if (value !== undefined && value !== null) {
+                    let column: any = undefined;
+
+                    if (key in model) {
+                        column = model[key as ModelColumnName];
+                    }
+                    else if (relationConfigs) {
+                        for (const rel of relationConfigs) {
+                            const matchingData = rel.relationData.find(d => d.aliasName === key);
+                            if (matchingData) {
+                                column = rel.relationTable[matchingData.columnOnRelationTableName];
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!column) return;
 
                     const processValue = (val: string) => {
                         const firstColonIndex = val.indexOf(':');
-
                         const validOperators = ['gte', 'lte', 'gt', 'lt', 'noteq'];
                         const possibleOp = val.substring(0, firstColonIndex);
 
@@ -85,15 +99,15 @@ const modelRepository = {
                             const actualValue = val.substring(firstColonIndex + 1);
 
                             switch (operator) {
-                                case 'gte': return gte(column as any, actualValue);
-                                case 'lte': return lte(column as any, actualValue);
-                                case 'gt': return gt(column as any, actualValue);
-                                case 'lt': return lt(column as any, actualValue);
-                                case 'noteq': return ne(column as any, actualValue);
+                                case 'gte': return gte(column, actualValue);
+                                case 'lte': return lte(column, actualValue);
+                                case 'gt': return gt(column, actualValue);
+                                case 'lt': return lt(column, actualValue);
+                                case 'noteq': return ne(column, actualValue);
                             }
                         }
 
-                        return eq(column as any, val);
+                        return eq(column, val);
                     };
 
                     if (Array.isArray(value)) {
@@ -109,11 +123,26 @@ const modelRepository = {
 
         if (paginationObject.sort) {
             Object.entries(paginationObject.sort).forEach(([key, direction]) => {
-                const column = model[key as ModelColumnName];
-                if (column) {
-                    const dir = Array.isArray(direction) ? direction[0] : direction;
-                    const isDesc = dir?.toLowerCase() === 'desc';
-                    orderSelectors.push(isDesc ? desc(column) : asc(column));
+                const dir = Array.isArray(direction) ? direction[0] : direction;
+                const isDesc = dir?.toLowerCase() === 'desc';
+
+                let targetColumn: any = undefined;
+
+                if (key in model) {
+                    targetColumn = model[key as ModelColumnName];
+                }
+                else if (relationConfigs) {
+                    for (const rel of relationConfigs) {
+                        const matchingData = rel.relationData.find(d => d.aliasName === key);
+                        if (matchingData) {
+                            targetColumn = rel.relationTable[matchingData.columnOnRelationTableName];
+                            break;
+                        }
+                    }
+                }
+
+                if (targetColumn) {
+                    orderSelectors.push(isDesc ? desc(targetColumn) : asc(targetColumn));
                 }
             });
         }
@@ -122,8 +151,9 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = rel.relationTable
                 rel.relationData.forEach((data) => {
-                    querySelect[data.aliasName] = rel.relationTable[data.columnOnRelationTableName];
+                    querySelect[data.aliasName] = tableToUse[data.columnOnRelationTableName];
                 });
             });
         }
@@ -132,9 +162,10 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = rel.relationTable
                 baseQuery.leftJoin(
-                    rel.relationTable,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
+                    tableToUse,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
@@ -161,9 +192,10 @@ const modelRepository = {
 
         if (relationConfigs) {
             relationConfigs.forEach((rel) => {
+                const tableToUse = rel.relationTable
                 countQuery.leftJoin(
-                    rel.relationTable,
-                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], rel.relationTable.uuid)
+                    tableToUse,
+                    eq(rel.tableSource ? rel.tableSource[rel.columnOnTableName] : model[rel.columnOnTableName as ModelColumnName], tableToUse.uuid)
                 );
             });
         }
